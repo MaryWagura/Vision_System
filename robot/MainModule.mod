@@ -2,40 +2,40 @@ MODULE MainModule
     !=====================================================================
     ! INA700 vision pick-and-place - ABB main module
     !
-    ! Frames:  every move uses tool1234 \WObj:=wobj1234.
-    ! Python must send pick X/Y in wobj1234 (marker values = aruco target).
+    ! Frames:  every move uses tool1234 \WObj:=wobj1212.
+    ! Python must send pick X/Y in wobj1212:
+    !   MARKER_ROBOT_X_MM = aruco.trans.x, MARKER_ROBOT_Y_MM = aruco.trans.y
     !
-    ! Before running after ANY tool change:
-    !   - re-measure PAPER_Z (cup sucked onto paper, read Z in wobj1234)
-    !   - re-teach p20 / p30 / p40 (place positions)
+    ! Before running after ANY tool or work object change:
+    !   - re-teach aruco (cup touching the marker centre)
+    !   - re-teach p20 / p30 / p40 (place positions) in wobj1212
     !   - first run in Manual reduced speed, stepping one instruction
     !=====================================================================
 
-    TASK PERS wobjdata wobj1234:=[FALSE,TRUE,"",[[478.279,-114.169,-10.3565],[0.999956,-0.00175295,0.000717086,0.00922622]],[[0,0,0],[1,0,0,0]]];
     TASK PERS tooldata tool1234:=[TRUE,[[-96.07,0.34481,181.882],[1,0,0,0]],[0.5,[50,0,50],[1,0,0,0],0,0,0]];
+    TASK PERS wobjdata wobj1212:=[FALSE,TRUE,"",[[448.359,-106.848,-10.0174],[0.999994,-0.00313365,0.00128173,-0.00037779]],[[0,0,0],[1,0,0,0]]];
 
-    ! Place positions on the designated-positions board (wobj1234)
+    ! Home: high above the paper, near the marker
+    CONST robtarget p10:=[[167.26,188.34,180.37],[0.0362958,0.0304525,-0.998773,-0.0144165],[0,0,0,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
+
+    ! Place positions on the designated-positions board.
+    ! WARNING: these values were taught in the old wobj1234, whose origin
+    ! is ~30 mm away from wobj1212. Re-teach them in wobj1212.
     CONST robtarget p20:=[[273.73,-66.71,14.75],[0.0110135,-0.0258492,-0.999605,0.000494662],[-1,-1,-1,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
     CONST robtarget p30:=[[205.88,-136.26,15.07],[0.0110339,-0.0258024,-0.999606,0.000509208],[-1,-1,-1,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
     CONST robtarget p40:=[[261.03,-195.60,14.50],[0.0110429,-0.0257536,-0.999607,0.000508994],[-1,-1,-1,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
 
-    ! Taught on the ArUco marker centre (wobj1234). Its X/Y must match
-    ! MARKER_ROBOT_X_MM / MARKER_ROBOT_Y_MM in the Python script.
-    CONST robtarget aruco:=[[115.38,208.96,5.56],[0.0324101,0.0123748,-0.999344,-0.0103724],[0,0,0,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
+    ! Taught with the cup on the ArUco marker centre (wobj1212).
+    ! Its X/Y must match MARKER_ROBOT_X_MM / MARKER_ROBOT_Y_MM in Python.
+    CONST robtarget aruco:=[[151.16,202.04,2.05],[0.0363271,0.0305793,-0.998768,-0.0143814],[0,0,0,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
 
-    ! The old p10 had Z = -53.92 (below the table) and caused the crash.
-    ! Home is now derived from the aruco target: HOME_DZ mm above the marker.
-    ! If you re-teach a proper home, you can replace pHome with it.
-    VAR robtarget pHome;
-
-    ! --- Heights (mm, wobj1234) ---
-    CONST num PAPER_Z := 0;         ! measured: cup sucked onto the paper
+    ! --- Heights (mm, wobj1212) ---
+    CONST num PAPER_Z := 2.05;      ! Z with the cup on the paper (= aruco.trans.z)
     CONST num SHAPE_THICK := 10;    ! all shapes are 1 cm thick
-    CONST num SQUEEZE := 0;         ! already included in PAPER_Z measurement
-    CONST num MIN_Z := 2;           ! crash guard: never closer to the paper
+    CONST num SQUEEZE := 0;         ! mm to press into the cup; raise by 0.5 if no seal
+    CONST num MIN_Z := 4;           ! crash guard: never closer to the paper
     CONST num APPROACH_DZ := 80;    ! hover height above pick/place before descending
-    CONST num HOME_DZ := 150;       ! home height above the marker
-    CONST num PLACE_DZ := 0;        ! raise to ~5 if p20-p40 are not re-taught with the new tool
+    CONST num PLACE_DZ := 5;        ! release height above p20-p40; 0 once re-taught
 
     ! --- Allowed pick area, relative to the marker centre (mm) ---
     ! Adjust to your paper. Targets outside are skipped, never moved to.
@@ -46,34 +46,34 @@ MODULE MainModule
     CONST bool SHOW_ARUCO := TRUE;
 
     PROC PickAndPlace(robtarget pickTarget, robtarget placeTarget)
-        MoveJ pHome, v500, fine, tool1234\WObj:=wobj1234;
+        MoveJ p10, v500, fine, tool1234\WObj:=wobj1212;
 
         IF SHOW_ARUCO THEN
             ! Visual check: cup should hover exactly over the marker centre
-            MoveJ Offs(aruco, 0, 0, APPROACH_DZ), v200, fine, tool1234\WObj:=wobj1234;
+            MoveJ Offs(aruco, 0, 0, APPROACH_DZ), v200, fine, tool1234\WObj:=wobj1212;
         ENDIF
 
         TPWrite "Moving to pick object";
-        MoveJ Offs(pickTarget, 0, 0, APPROACH_DZ), v200, fine, tool1234\WObj:=wobj1234;
-        MoveL pickTarget, v50, fine, tool1234\WObj:=wobj1234;
+        MoveJ Offs(pickTarget, 0, 0, APPROACH_DZ), v200, fine, tool1234\WObj:=wobj1212;
+        MoveL pickTarget, v50, fine, tool1234\WObj:=wobj1212;
 
         TPWrite "Vacuum ON";
         Set doValve1;
         WaitTime 0.5;
-        MoveL Offs(pickTarget, 0, 0, APPROACH_DZ), v100, fine, tool1234\WObj:=wobj1234;
+        MoveL Offs(pickTarget, 0, 0, APPROACH_DZ), v100, fine, tool1234\WObj:=wobj1212;
 
-        MoveJ pHome, v500, fine, tool1234\WObj:=wobj1234;
+        MoveJ p10, v500, fine, tool1234\WObj:=wobj1212;
 
         TPWrite "Moving to placing position";
-        MoveJ Offs(placeTarget, 0, 0, APPROACH_DZ), v200, fine, tool1234\WObj:=wobj1234;
-        MoveL Offs(placeTarget, 0, 0, PLACE_DZ), v50, fine, tool1234\WObj:=wobj1234;
+        MoveJ Offs(placeTarget, 0, 0, APPROACH_DZ), v200, fine, tool1234\WObj:=wobj1212;
+        MoveL Offs(placeTarget, 0, 0, PLACE_DZ), v50, fine, tool1234\WObj:=wobj1212;
 
         TPWrite "Vacuum OFF";
         Reset doValve1;
         WaitTime 1;
-        MoveL Offs(placeTarget, 0, 0, APPROACH_DZ), v100, fine, tool1234\WObj:=wobj1234;
+        MoveL Offs(placeTarget, 0, 0, APPROACH_DZ), v100, fine, tool1234\WObj:=wobj1212;
 
-        MoveJ pHome, v500, fine, tool1234\WObj:=wobj1234;
+        MoveJ p10, v500, fine, tool1234\WObj:=wobj1212;
     ENDPROC
 
     PROC main()
@@ -95,8 +95,6 @@ MODULE MainModule
         VAR bool known_shape;
         VAR robtarget dynamicPickTarget;
         VAR robtarget staticPlaceTarget;
-
-        pHome := Offs(aruco, 0, 0, HOME_DZ);
 
         TPWrite "Vision Pick and Place Started";
 
@@ -135,7 +133,7 @@ MODULE MainModule
                     ok_x := StrToVal(str_x, val_x);
                     ok_y := StrToVal(str_y, val_y);
                     ok_angle := StrToVal(str_angle, val_angle);
-                    IF NOT ok_angle THEN
+                    IF ok_angle = FALSE THEN
                         val_angle := 0;
                     ENDIF
 
@@ -159,10 +157,12 @@ MODULE MainModule
                         pickZ := MIN_Z;
                     ENDIF
 
-                    IF NOT ok_x OR NOT ok_y THEN
+                    ! In RAPID, NOT has the same low priority as OR, so
+                    ! "NOT a OR NOT b" does not compile - compare to FALSE instead.
+                    IF ok_x = FALSE OR ok_y = FALSE THEN
                         TPWrite "Bad coordinates received: " + visionData;
                         WaitTime 2;
-                    ELSEIF NOT known_shape THEN
+                    ELSEIF known_shape = FALSE THEN
                         TPWrite "Unknown shape - skipped: " + str_shape;
                         WaitTime 2;
                     ELSEIF Abs(val_x - aruco.trans.x) > REACH_X OR Abs(val_y - aruco.trans.y) > REACH_Y THEN
