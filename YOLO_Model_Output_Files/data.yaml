@@ -1,0 +1,7 @@
+path: /kaggle/working/yolo_ds
+train: images/train
+val: images/val
+names:
+  0: circle
+  1: square
+  2: star

@@ -31,7 +31,7 @@ FRESH_TIMEOUT_S = 5.0     # give up waiting for fresh frames after this long
 
 # --- YOLO MODEL (Using OpenCV DNN instead of Ultralytics) ---
 print("Loading YOLO model via OpenCV DNN...")
-net = cv2.dnn.readNetFromONNX("mary_best.onnx")
+net = cv2.dnn.readNetFromONNX("best.onnx")
 
 # --- LEVEL III: inference time must not exceed 3 seconds ---
 INFERENCE_LIMIT_S = 3.0

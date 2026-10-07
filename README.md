@@ -42,7 +42,7 @@ There's **one Ethernet cable** going to the robot controller, and it's used for 
 
 | File | Where it runs | What it does |
 |---|---|---|
-| [`main_vision_color.py`](main_vision_color.py) | Raspberry Pi | **The vision main script.** Grabs frames from the Basler camera, finds the ArUco marker, detects shapes with YOLO, rejects anything that isn't a circle/square/star (e.g. triangles, hexagons), identifies each shape's **colour**, converts pixels to robot X/Y (mm) and answers the robot over TCP. Prints the **inference time** of every frame and logs it to `inference_log.csv`. Also serves the live video feed. |
+| [`main_vision_finale.py`](main_vision_finale.py) | Raspberry Pi | **The vision main script.** Grabs frames from the Basler camera, finds the ArUco marker, detects shapes with YOLO, rejects anything that isn't a circle/square/star (e.g. triangles, hexagons), identifies each shape's **colour**, converts pixels to robot X/Y (mm) and answers the robot over TCP. Prints the **inference time** of every frame and logs it to `inference_log.csv`. Also serves the live video feed. |
 | `mary_vision_common_with_yolo.py` *(on the Pi)* | Raspberry Pi | Shared helpers: ArUco marker detection (`DICT_5X5_100`, **100 mm** marker), pixel→mm scale, workspace utilities. |
 | `mary_best.onnx` *(on the Pi)* | Raspberry Pi | The trained YOLOv8 model (classes: `circle`, `square`, `star`). Loaded with OpenCV DNN, so **no Ultralytics needed on the Pi**. |
 | [`robot/MainModule.mod`](robot/MainModule.mod) | ABB controller | The robot program: asks the Pi which colours and shapes it sees, lets the operator choose on the FlexPendant, then picks that object and places it in its slot. Runs endless cycles. |
@@ -98,12 +98,12 @@ Run these in **PowerShell** on the Windows desktop. Replace `pi` with the Pi's u
 
 **Copy one file** from your Windows `Downloads` to the Pi's `Downloads`:
 ```powershell
-scp "$env:USERPROFILE\Downloads\mary_best.onnx" student@192.168.140.113:~/Downloads/
+scp "$env:USERPROFILE\Downloads\mbest.onnx" student@192.168.140.113:~/Downloads/
 ```
 
 **Copy several files at once:**
 ```powershell
-scp "$env:USERPROFILE\Downloads\main_vision_color.py" "$env:USERPROFILE\Downloads\mary_vision_common_with_yolo.py" pi@192.168.140.113:~/Downloads/
+scp "$env:USERPROFILE\Downloads\main_vision_finale.py" "$env:USERPROFILE\Downloads\vision_common_with_yolo.py" pi@192.168.140.113:~/Downloads/
 ```
 
 **Copy a whole folder:**
