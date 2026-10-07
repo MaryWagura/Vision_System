@@ -224,3 +224,6 @@ These must stay consistent between the robot and the Python script.
 | Every shape skipped as *"Unknown shape"* | Shape names don't match: RAPID must compare lowercase `circle` / `star` / `square`. |
 | Triangle or hexagon gets picked | The geometry check in the vision script is off or needs tuning. Check the printed `corners=… circle_fill=…` values. |
 | `scp` / `ssh` times out | Use the Pi's LAN IP `192.168.140.113`, not `.207`, and check the Pi is powered on. |
+
+## Acknowledgements
+*This Project was in collaboration with Elias & Kelvin.*
