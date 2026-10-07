@@ -98,7 +98,7 @@ Run these in **PowerShell** on the Windows desktop. Replace `pi` with the Pi's u
 
 **Copy one file** from your Windows `Downloads` to the Pi's `Downloads`:
 ```powershell
-scp "$env:USERPROFILE\Downloads\mary_best.onnx" pi@192.168.140.113:~/Downloads/
+scp "$env:USERPROFILE\Downloads\mary_best.onnx" student@192.168.140.113:~/Downloads/
 ```
 
 **Copy several files at once:**
