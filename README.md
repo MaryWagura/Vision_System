@@ -17,8 +17,7 @@ A camera above the table spots shapes on the paper, a Raspberry Pi works out **w
 | ABB robot controller | `192.168.125.1` | RobotStudio / FlexPendant connection |
 
 - Live camera feed (while the vision script runs): **http://192.168.140.113:8080**
-- The address `192.168.125.207` and port `5000` appear in **two places**, and they must match:
-  - Python vision script: `HOST = "192.168.125.207"`, `PORT = 5000`
+- The vision script listens on **all** the Pi's network interfaces (`HOST = "0.0.0.0"`), so it never needs editing when the Pi's IP changes. Only the RAPID side names the address:
   - RAPID `ServerComms` module: `SocketConnect robotClient, "192.168.125.207", 5000;`
 
 ---
@@ -191,7 +190,7 @@ Camera active. Waiting for robot...
 
 Open the live feed from a PC on the same Wi-Fi: `http://192.168.140.112:8080`. Stop the script with `Ctrl + C`.
 
-**Testing without the robot:** set `HOST = "0.0.0.0"` in `MainVision_finale.py` to listen on every interface.
+The script listens on every interface (`HOST = "0.0.0.0"`), so it also works for testing without the robot.
 
 ### 5. Troubleshooting
 
@@ -314,16 +313,15 @@ These must stay consistent between the robot and the Python script.
 | Work object | `wobj1`. **All** robot targets and readings use this. |
 | FlexPendant jogging | Tool = `tool1`, Work object = `wobj1`, Coordinate system = **Work object** |
 | Image ↔ robot axes | robot **+X = image down**, robot **+Y = image right** |
-| Marker position | RAPID `aruco` target X/Y **=** Python `MARKER_ROBOT_X_MM` / `MARKER_ROBOT_Y_MM` |
+| Marker position | Taught RAPID target `aruco` (cup centred on the marker, touching the paper). Python sends positions **relative to the marker**, so nothing in Python needs changing. |
 | Marker size | 100 mm (outer black square), `DICT_5X5_100` |
-| Paper height | Z of the `aruco` target (taught with the cup sucked onto the marker). The pick height follows it automatically. |
-| Shape thickness | 10 mm. Pick height = `aruco` Z + 10 mm. |
+| Pick height | Taught RAPID target `shapeTop`: cup pressed onto a real shape until the vacuum holds it. Its Z is used directly, whether it's positive or negative. |
+| Shape thickness | 10 mm (only used to stack extra shapes in a slot). |
 | Shape names | Python sends lowercase: `circle`, `square`, `star` |
 
-**If the paper or marker moves:**
-1. Jog the suction cup onto the marker's centre (`tool1` + `wobj1`), touching the paper.
-2. Re-teach the `aruco` target.
-3. Copy its X/Y into `MARKER_ROBOT_X_MM` / `MARKER_ROBOT_Y_MM` in the Python script.
+**If the paper, marker, tool or work object changes:** re-teach two points on the FlexPendant (`tool1` + `wobj1`, then **Modify Position**). No code changes, in Python or RAPID:
+1. **`aruco`**: jog the cup onto the marker's centre, touching the paper.
+2. **`shapeTop`**: put a shape on the paper, jog the cup down onto it, turn the valve on and keep going down until the vacuum holds the shape. Modify Position there.
 
 **If the camera gets bumped or moved:** re-check the marker position and the axis directions before running.
 
@@ -345,9 +343,9 @@ These must stay consistent between the robot and the Python script.
 | Pendant stuck at after *"I LIVE"*, or no colour menu appears | Cable is still in the desktop, or the vision script isn't running. Plug the cable into the Pi and start the script. |
 | Pendant keeps saying *"No pickable shapes on the paper"* | The camera sees no circle/square/star with a recognised colour. Check the live feed and the `colour=…` debug lines on the Pi. |
 | A shape is on the paper but missing from the menu | Its colour came out `unknown`, or it failed the geometry check. Check the `colour=…` / `corners=…` debug lines and tune the thresholds. |
-| Cup stops a few mm above the shape | The `aruco` target wasn't taught touching the paper. Jog the cup down onto the marker and re-teach `aruco`. |
+| Cup stops above the shape / vacuum doesn't hold | Re-teach `shapeTop` with the cup pressed onto a shape until the vacuum holds. If it still slips, set `EXTRA_SQUEEZE` to 0.5–1. |
 | `no marker` printed on the Pi | Marker not in view, covered or badly lit. |
-| Shapes detected but the robot goes to the wrong place | Marker X/Y in Python ≠ `aruco` target, or the paper/camera moved. Re-teach `aruco` and update Python. |
+| Shapes detected but the robot goes to the wrong place | The paper, marker or camera moved. Re-teach `aruco` (cup on the marker centre). |
 | Robot picks the right spot but places in the wrong slot | Re-teach `p20` (circle), `p30` (star), `p40` (square) in `wobj1`. |
 | Every shape skipped as *"Unknown shape"* | Shape names don't match: RAPID must compare lowercase `circle` / `star` / `square`. |
 | Triangle or hexagon gets picked | The geometry check in the vision script is off or needs tuning. Check the printed `corners=… circle_fill=…` values. |
