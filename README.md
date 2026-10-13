@@ -54,7 +54,7 @@ There's **one Ethernet cable** going to the robot controller, and it's used for 
 
 | File | What it does |
 |---|---|
-| [`camera_setup.py`](camera_setup.py) | Live camera view with setup checks (marker found, camera tilt, focus, brightness, centre crosshair). Run it when positioning the camera, paper or marker. |
+| [`camera_setup.py`](camera_setup.py) | Starts the Basler camera and shows the live view in the browser. Use it to check the camera position. |
 | `capture_final_images.py` | Collects training images from the Basler camera (saves a frame every 10 s into `dataset/`, with a live preview on port 5000). |
 | `YOLO_Train.ipynb` | Kaggle notebook: prepares the labelled dataset and trains the YOLOv8 model, then exports it to ONNX (`best.onnx` → renamed `mary_best.onnx` on the Pi). |
 | `mv_more_data.ipynb`, `Machine-Vision-v2.ipynb`, `machine-vision-v1.ipynb`, `Machine-Vision-1`, `Vision_Train_Model` | Earlier experiments (classic contour features + Random Forest / XGBoost). Kept for reference. |
@@ -121,27 +121,15 @@ ssh pi@192.168.140.113
 
 ---
 
-## 📷 Setting up the camera (do this first)
+## 📷 Checking the camera view
 
-Use [`camera_setup.py`](camera_setup.py) whenever the camera, paper or marker has been moved. It only shows the live camera with setup checks drawn on top. There's no YOLO and no robot connection.
+To just see what the camera sees (e.g. after moving the camera, paper or marker), run [`camera_setup.py`](camera_setup.py) on the Pi and open **http://192.168.140.113:8080**:
 
 ```bash
-ssh pi@192.168.140.113
-source ~/vision-env/bin/activate
-cd ~/Downloads
 python3 camera_setup.py
 ```
-Open **http://192.168.140.113:8080** and adjust until every line is green:
 
-| Check | What to do |
-|---|---|
-| **Marker** found | The ArUco marker must be fully in view. Red = not found: check it isn't covered or in glare. |
-| **Tilt** ≤ 1 % | Opposite sides of the marker must be the same length. If not, the camera isn't looking straight down, so adjust its angle on the pole. |
-| **Brightness / blown-out** | Too dark or pure-white patches make colours unreliable. Adjust the lights or the camera exposure. |
-| **Focus** | Turn the focus ring slowly. The number is highest when the image is sharpest. |
-| **Centre crosshair** | Put the paper roughly in the middle of the view, with the marker near the crosshair. |
-
-The same readings are printed in the terminal once a second. Stop with `Ctrl + C` **before** starting the vision script, because both use the camera and port 8080.
+Stop it with `Ctrl + C` before starting the vision script, because both use the camera and port 8080.
 
 ---
 
