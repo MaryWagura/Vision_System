@@ -93,6 +93,121 @@ source ~/vision-env/bin/activate
 
 ---
 
+## 🍓 MainVision – Raspberry Pi vision server for the ABB robot
+
+Runs on the Raspberry Pi (`pi-group12`). A Basler camera finds circles, squares and stars, and the script sends their
+robot coordinates to the ABB controller over TCP. A live video feed is served over the network.
+
+| What | Address |
+|---|---|
+| Pi on Wi-Fi (live feed) | `http://192.168.140.112:8080` |
+| Pi on robot network (`eth0`) | `192.168.125.211` |
+| TCP server for RAPID | `192.168.125.211:5000` |
+
+### 1. Install dependencies (once)
+
+```bash
+sudo apt update
+pip install opencv-contrib-python pypylon flask --break-system-packages
+```
+
+Check that everything installed:
+
+```bash
+python3 -c "import cv2, flask; from pypylon import pylon; print('OK', cv2.__version__, hasattr(cv2.aruco, 'ArucoDetector'))"
+```
+
+It should print `OK 4.x.x True` with OpenCV **4.7 or newer**.
+
+> Use the pip package `opencv-contrib-python`, not `sudo apt install python3-opencv`: on Raspberry Pi OS the apt
+> version is OpenCV 4.6, which doesn't have `cv2.aruco.ArucoDetector`, so the marker detection fails.
+> The pip package is `pypylon` (not `pyplon`).
+
+### 2. Connect the camera
+
+The camera must be plugged into the **Raspberry Pi**, not the PC. The PC is only used to watch the live feed.
+
+- **USB camera** (model ends in `um`/`uc`/`ubm`/`ubc`): plug it straight into a **blue USB 3 port** with a proper USB 3
+  cable. Don't use a hub or extension.
+- **GigE camera** (model ends in `gm`/`gc`/`gbm`/`gbc`): it needs its own power (PoE injector or power cable), because
+  the Pi's Ethernet port supplies none. It must be cabled to the Pi, not to the lab network.
+
+Check that the Pi sees the camera:
+
+```bash
+lsusb | grep 2676                      # USB: a line with 2676 = Basler camera found
+python3 -c "from pypylon import pylon; print([d.GetModelName() for d in pylon.TlFactory.GetInstance().EnumerateDevices()])"
+```
+
+If the list is empty, check the cable, port and power, and watch `sudo dmesg -w` while you replug the camera.
+
+### 3. Connect the Pi to the robot network
+
+The script listens on `192.168.125.211`, which is the address the RAPID code connects to. The Pi must own this address
+on `eth0`, or the TCP server fails with `OSError: [Errno 99] Cannot assign requested address`.
+
+1. Connect an Ethernet cable from the Pi's `eth0` to the robot controller's network.
+2. Give `eth0` the robot-network address:
+
+   ```bash
+   sudo ip addr add 192.168.125.211/24 dev eth0
+   ip addr show eth0        # should show: state UP  and  inet 192.168.125.211/24
+   ```
+
+3. Check you can reach the controller (replace with your controller's IP if it is different):
+
+   ```bash
+   ping 192.168.125.1
+   ```
+
+The `ip addr add` command is lost on reboot. To make the address permanent:
+
+```bash
+nmcli con show                                   # find the wired connection name
+sudo nmcli con mod "Wired connection 1" ipv4.method manual ipv4.addresses 192.168.125.211/24
+sudo nmcli con up "Wired connection 1"
+```
+
+> **GigE camera + robot:** both can't each have their own cable in the single `eth0` port. Use a switch or a
+> USB-Ethernet adapter for the second connection. With a USB camera, `eth0` is free for the robot.
+
+### 4. Run
+
+These files must be in the same folder: `MainVision_finale.py`, `mary_vision_common_with_yolo.py` and `mary_best.onnx`.
+
+```bash
+cd ~/Downloads
+python3 MainVision_finale.py
+```
+
+Expected startup output:
+
+```
+Model warm-up: ... ms (not counted)
+TCP Server listening on 192.168.125.211:5000
+Live Video Feed available at: http://192.168.140.112:8080
+Camera active. Waiting for robot...
+```
+
+Open the live feed from a PC on the same Wi-Fi: `http://192.168.140.112:8080`. Stop the script with `Ctrl + C`.
+
+**Testing without the robot:** set `HOST = "0.0.0.0"` in `MainVision_finale.py` to listen on every interface.
+
+### 5. Troubleshooting
+
+| Error / symptom | Meaning | Fix |
+|---|---|---|
+| `python : The term 'python' is not recognized` (Windows) | Python is not on PATH | Use `py`, or add `...\AppData\Local\Programs\Python\Python3xx` and its `Scripts` folder to PATH |
+| `No matching distribution found for OpenCV` | Wrong package name | `pip install opencv-contrib-python --break-system-packages` |
+| `AttributeError: ... 'ArucoDetector'` | OpenCV is older than 4.7 (e.g. the apt `python3-opencv`) | `sudo apt remove python3-opencv`, then `pip install opencv-contrib-python --break-system-packages` |
+| `No device is available ... (file 'TlFactory.cpp', line 694)` | pylon found **no camera** (the file name is from Basler's internal C++ SDK) | See step 2: cable, USB 3 port, power, camera plugged into the Pi |
+| `OSError: [Errno 99] Cannot assign requested address` | The Pi doesn't have the IP in `HOST` | See step 3: give `eth0` the address `192.168.125.211` |
+| `OSError: [Errno 98] Address already in use` | Another program is already using the port | `sudo ss -tlnp \| grep 5000` to find it, then stop it (or wait ~30 s after a restart) |
+| `eth0` shows `NO-CARRIER` | No live cable link | Check the cable, and the camera/switch power |
+| Live feed doesn't load | Server not running or not reachable | On the Pi: `ss -tlnp \| grep 8080`. On Windows: `Test-NetConnection 192.168.140.112 -Port 8080` |
+
+---
+
 ## 📤 Copying files from Windows to the Pi (SSH / SCP)
 
 Run these in **PowerShell** on the Windows desktop. Replace `pi` with the Pi's username if it's different.
