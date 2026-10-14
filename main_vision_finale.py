@@ -10,19 +10,24 @@ from flask import Flask, Response
 import mary_vision_common_with_yolo as vc
 
 # --- CONFIGURATION ---
-HOST = "192.168.125.207"
+# Listen on every network interface, so the script never needs editing when the
+# Pi's IP changes. RAPID just connects to whatever address the Pi has on eth0.
+HOST = "0.0.0.0"
 PORT = 5000  # Matches ABB RAPID code
 
-# *** PHYSICAL CALIBRATION TARGETS ***
-# Must match the X/Y of the RAPID 'aruco' target (tool1234, wobj1212)
-MARKER_ROBOT_X_MM = 118.64
-MARKER_ROBOT_Y_MM = 193.32
+# *** NO ROBOT CALIBRATION IN THIS FILE ***
+# Positions are sent as mm OFFSETS from the ArUco marker centre (in robot axes).
+# The robot adds them to its taught 'aruco' target, so re-teaching 'aruco' on the
+# FlexPendant is all that's needed when the paper, marker or work object moves.
+MARKER_ROBOT_X_MM = 0.0
+MARKER_ROBOT_Y_MM = 0.0
 
 # --- GRADE D: colour AND shape are chosen on the FlexPendant each cycle ---
 # Robot commands (the pendant only offers what the camera actually sees):
 #   LIST_COLORS                       -> "blue,red"         (or "NONE")
 #   LIST_SHAPES,<colour>              -> "square,star"      (or "NONE")
-#   REQUEST_COORDS,<colour>,<shape>   -> "square,x,y,angle" (or "NO_TARGET,0,0,0")
+#   REQUEST_COORDS,<colour>,<shape>   -> "square,dx,dy,angle" (or "NO_TARGET,0,0,0")
+#     dx, dy = mm from the marker centre along robot X / Y (RAPID adds aruco X/Y)
 # Any field may be left out or set to "any" ("REQUEST_COORDS" = any shape).
 VALID_COLORS = ("black", "red", "green", "blue", "white")
 VALID_SHAPES = ("circle", "square", "star")
@@ -344,6 +349,7 @@ def process_frame(img):
         right_mm = (center_px[0] - mx_c) * s   # + = right in image
         down_mm = (center_px[1] - my_c) * s    # + = down in image
 
+        # Offsets from the marker in robot axes (the robot adds its 'aruco' X/Y)
         pick_x = MARKER_ROBOT_X_MM + down_mm    # robot +X = image down
         pick_y = MARKER_ROBOT_Y_MM + right_mm   # robot +Y = image right
 
@@ -362,6 +368,15 @@ def process_frame(img):
 
     timing["total_s"] = time.perf_counter() - t_start
     return detected_objects, ignored, timing
+
+
+def local_ips():
+    """The Pi's IP addresses, for the startup message (no hard-coded IPs)."""
+    try:
+        import subprocess
+        return subprocess.run(["hostname", "-I"], capture_output=True, text=True, timeout=2).stdout.strip() or "unknown"
+    except Exception:
+        return "unknown"
 
 
 # --- TCP SERVER ---
@@ -446,7 +461,7 @@ def tcp_server():
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         s.bind((HOST, PORT))
         s.listen()
-        print(f"TCP Server listening on {HOST}:{PORT}")
+        print(f"TCP Server listening on port {PORT} (all interfaces: {local_ips()})")
 
         while True:
             conn, addr = s.accept()
@@ -494,7 +509,7 @@ def main():
     log = logging.getLogger('werkzeug')
     log.setLevel(logging.ERROR)
     threading.Thread(target=lambda: app.run(host='0.0.0.0', port=8080, debug=False, use_reloader=False), daemon=True).start()
-    print("Live Video Feed available at: http://192.168.140.113:8080")
+    print(f"Live Video Feed available at: http://<this Pi's Wi-Fi IP>:8080   (Pi IPs: {local_ips()})")
 
     try:
         tl_factory = pylon.TlFactory.GetInstance()
@@ -540,7 +555,7 @@ def main():
                     dx, dy = int(cx * sx), int(cy * sy)
                     cv2.circle(display_img, (dx, dy), 6, (0, 255, 0), -1)
                     cv2.putText(display_img, f"{color} {shape} {angle}deg", (dx + 10, dy - 25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
-                    cv2.putText(display_img, f"X:{pick_x} Y:{pick_y}", (dx + 10, dy), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                    cv2.putText(display_img, f"dX:{pick_x} dY:{pick_y} mm", (dx + 10, dy), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
                 # Ignored detections (not circle/square/star): grey cross + label
                 for label, cx, cy in ignored:

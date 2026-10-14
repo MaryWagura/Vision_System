@@ -17,8 +17,7 @@ A camera above the table spots shapes on the paper, a Raspberry Pi works out **w
 | ABB robot controller | `192.168.125.1` | RobotStudio / FlexPendant connection |
 
 - Live camera feed (while the vision script runs): **http://192.168.140.113:8080**
-- The address `192.168.125.207` and port `5000` appear in **two places**, and they must match:
-  - Python vision script: `HOST = "192.168.125.207"`, `PORT = 5000`
+- The vision script listens on **all** the Pi's network interfaces (`HOST = "0.0.0.0"`), so it never needs editing when the Pi's IP changes. Only the RAPID side names the address:
   - RAPID `ServerComms` module: `SocketConnect robotClient, "192.168.125.207", 5000;`
 
 ---
@@ -54,6 +53,7 @@ There's **one Ethernet cable** going to the robot controller, and it's used for 
 
 | File | What it does |
 |---|---|
+| [`camera_setup.py`](camera_setup.py) | Starts the Basler camera and shows the live view in the browser. Use it to check the camera position. |
 | `capture_final_images.py` | Collects training images from the Basler camera (saves a frame every 10 s into `dataset/`, with a live preview on port 5000). |
 | `YOLO_Train.ipynb` | Kaggle notebook: prepares the labelled dataset and trains the YOLOv8 model, then exports it to ONNX (`best.onnx` → renamed `mary_best.onnx` on the Pi). |
 | `mv_more_data.ipynb`, `Machine-Vision-v2.ipynb`, `machine-vision-v1.ipynb`, `Machine-Vision-1`, `Vision_Train_Model` | Earlier experiments (classic contour features + Random Forest / XGBoost). Kept for reference. |
@@ -92,6 +92,121 @@ source ~/vision-env/bin/activate
 
 ---
 
+## 🍓 MainVision – Raspberry Pi vision server for the ABB robot
+
+Runs on the Raspberry Pi (`pi-group12`). A Basler camera finds circles, squares and stars, and the script sends their
+robot coordinates to the ABB controller over TCP. A live video feed is served over the network.
+
+| What | Address |
+|---|---|
+| Pi on Wi-Fi (live feed) | `http://192.168.140.112:8080` |
+| Pi on robot network (`eth0`) | `192.168.125.211` |
+| TCP server for RAPID | `192.168.125.211:5000` |
+
+### 1. Install dependencies (once)
+
+```bash
+sudo apt update
+pip install opencv-contrib-python pypylon flask --break-system-packages
+```
+
+Check that everything installed:
+
+```bash
+python3 -c "import cv2, flask; from pypylon import pylon; print('OK', cv2.__version__, hasattr(cv2.aruco, 'ArucoDetector'))"
+```
+
+It should print `OK 4.x.x True` with OpenCV **4.7 or newer**.
+
+> Use the pip package `opencv-contrib-python`, not `sudo apt install python3-opencv`: on Raspberry Pi OS the apt
+> version is OpenCV 4.6, which doesn't have `cv2.aruco.ArucoDetector`, so the marker detection fails.
+> The pip package is `pypylon` (not `pyplon`).
+
+### 2. Connect the camera
+
+The camera must be plugged into the **Raspberry Pi**, not the PC. The PC is only used to watch the live feed.
+
+- **USB camera** (model ends in `um`/`uc`/`ubm`/`ubc`): plug it straight into a **blue USB 3 port** with a proper USB 3
+  cable. Don't use a hub or extension.
+- **GigE camera** (model ends in `gm`/`gc`/`gbm`/`gbc`): it needs its own power (PoE injector or power cable), because
+  the Pi's Ethernet port supplies none. It must be cabled to the Pi, not to the lab network.
+
+Check that the Pi sees the camera:
+
+```bash
+lsusb | grep 2676                      # USB: a line with 2676 = Basler camera found
+python3 -c "from pypylon import pylon; print([d.GetModelName() for d in pylon.TlFactory.GetInstance().EnumerateDevices()])"
+```
+
+If the list is empty, check the cable, port and power, and watch `sudo dmesg -w` while you replug the camera.
+
+### 3. Connect the Pi to the robot network
+
+The script listens on `192.168.125.211`, which is the address the RAPID code connects to. The Pi must own this address
+on `eth0`, or the TCP server fails with `OSError: [Errno 99] Cannot assign requested address`.
+
+1. Connect an Ethernet cable from the Pi's `eth0` to the robot controller's network.
+2. Give `eth0` the robot-network address:
+
+   ```bash
+   sudo ip addr add 192.168.125.211/24 dev eth0
+   ip addr show eth0        # should show: state UP  and  inet 192.168.125.211/24
+   ```
+
+3. Check you can reach the controller (replace with your controller's IP if it is different):
+
+   ```bash
+   ping 192.168.125.1
+   ```
+
+The `ip addr add` command is lost on reboot. To make the address permanent:
+
+```bash
+nmcli con show                                   # find the wired connection name
+sudo nmcli con mod "Wired connection 1" ipv4.method manual ipv4.addresses 192.168.125.211/24
+sudo nmcli con up "Wired connection 1"
+```
+
+> **GigE camera + robot:** both can't each have their own cable in the single `eth0` port. Use a switch or a
+> USB-Ethernet adapter for the second connection. With a USB camera, `eth0` is free for the robot.
+
+### 4. Run
+
+These files must be in the same folder: `MainVision_finale.py`, `mary_vision_common_with_yolo.py` and `mary_best.onnx`.
+
+```bash
+cd ~/Downloads
+python3 MainVision_finale.py
+```
+
+Expected startup output:
+
+```
+Model warm-up: ... ms (not counted)
+TCP Server listening on 192.168.125.211:5000
+Live Video Feed available at: http://192.168.140.112:8080
+Camera active. Waiting for robot...
+```
+
+Open the live feed from a PC on the same Wi-Fi: `http://192.168.140.112:8080`. Stop the script with `Ctrl + C`.
+
+The script listens on every interface (`HOST = "0.0.0.0"`), so it also works for testing without the robot.
+
+### 5. Troubleshooting
+
+| Error / symptom | Meaning | Fix |
+|---|---|---|
+| `python : The term 'python' is not recognized` (Windows) | Python is not on PATH | Use `py`, or add `...\AppData\Local\Programs\Python\Python3xx` and its `Scripts` folder to PATH |
+| `No matching distribution found for OpenCV` | Wrong package name | `pip install opencv-contrib-python --break-system-packages` |
+| `AttributeError: ... 'ArucoDetector'` | OpenCV is older than 4.7 (e.g. the apt `python3-opencv`) | `sudo apt remove python3-opencv`, then `pip install opencv-contrib-python --break-system-packages` |
+| `No device is available ... (file 'TlFactory.cpp', line 694)` | pylon found **no camera** (the file name is from Basler's internal C++ SDK) | See step 2: cable, USB 3 port, power, camera plugged into the Pi |
+| `OSError: [Errno 99] Cannot assign requested address` | The Pi doesn't have the IP in `HOST` | See step 3: give `eth0` the address `192.168.125.211` |
+| `OSError: [Errno 98] Address already in use` | Another program is already using the port | `sudo ss -tlnp \| grep 5000` to find it, then stop it (or wait ~30 s after a restart) |
+| `eth0` shows `NO-CARRIER` | No live cable link | Check the cable, and the camera/switch power |
+| Live feed doesn't load | Server not running or not reachable | On the Pi: `ss -tlnp \| grep 8080`. On Windows: `Test-NetConnection 192.168.140.112 -Port 8080` |
+
+---
+
 ## 📤 Copying files from Windows to the Pi (SSH / SCP)
 
 Run these in **PowerShell** on the Windows desktop. Replace `pi` with the Pi's username if it's different.
@@ -117,6 +232,18 @@ ssh pi@192.168.140.113
 ```
 
 > 💡 The first time, it asks *"Are you sure you want to continue connecting?"*: type `yes`, then enter the Pi's password.
+
+---
+
+## 📷 Checking the camera view
+
+To just see what the camera sees (e.g. after moving the camera, paper or marker), run [`camera_setup.py`](camera_setup.py) on the Pi and open **http://192.168.140.113:8080**:
+
+```bash
+python3 camera_setup.py
+```
+
+Stop it with `Ctrl + C` before starting the vision script, because both use the camera and port 8080.
 
 ---
 
@@ -186,16 +313,15 @@ These must stay consistent between the robot and the Python script.
 | Work object | `wobj1`. **All** robot targets and readings use this. |
 | FlexPendant jogging | Tool = `tool1`, Work object = `wobj1`, Coordinate system = **Work object** |
 | Image ↔ robot axes | robot **+X = image down**, robot **+Y = image right** |
-| Marker position | RAPID `aruco` target X/Y **=** Python `MARKER_ROBOT_X_MM` / `MARKER_ROBOT_Y_MM` |
+| Marker position | Taught RAPID target `aruco` (cup centred on the marker, touching the paper). Python sends positions **relative to the marker**, so nothing in Python needs changing. |
 | Marker size | 100 mm (outer black square), `DICT_5X5_100` |
-| Paper height | Z of the `aruco` target (taught with the cup sucked onto the marker). The pick height follows it automatically. |
-| Shape thickness | 10 mm. Pick height = `aruco` Z + 10 mm. |
+| Pick height | Taught RAPID target `shapeTop`: cup pressed onto a real shape until the vacuum holds it. Its Z is used directly, whether it's positive or negative. |
+| Shape thickness | 10 mm (only used to stack extra shapes in a slot). |
 | Shape names | Python sends lowercase: `circle`, `square`, `star` |
 
-**If the paper or marker moves:**
-1. Jog the suction cup onto the marker's centre (`tool1` + `wobj1`), touching the paper.
-2. Re-teach the `aruco` target.
-3. Copy its X/Y into `MARKER_ROBOT_X_MM` / `MARKER_ROBOT_Y_MM` in the Python script.
+**If the paper, marker, tool or work object changes:** re-teach two points on the FlexPendant (`tool1` + `wobj1`, then **Modify Position**). No code changes, in Python or RAPID:
+1. **`aruco`**: jog the cup onto the marker's centre, touching the paper.
+2. **`shapeTop`**: put a shape on the paper, jog the cup down onto it, turn the valve on and keep going down until the vacuum holds the shape. Modify Position there.
 
 **If the camera gets bumped or moved:** re-check the marker position and the axis directions before running.
 
@@ -217,9 +343,9 @@ These must stay consistent between the robot and the Python script.
 | Pendant stuck at after *"I LIVE"*, or no colour menu appears | Cable is still in the desktop, or the vision script isn't running. Plug the cable into the Pi and start the script. |
 | Pendant keeps saying *"No pickable shapes on the paper"* | The camera sees no circle/square/star with a recognised colour. Check the live feed and the `colour=…` debug lines on the Pi. |
 | A shape is on the paper but missing from the menu | Its colour came out `unknown`, or it failed the geometry check. Check the `colour=…` / `corners=…` debug lines and tune the thresholds. |
-| Cup stops a few mm above the shape | The `aruco` target wasn't taught touching the paper. Jog the cup down onto the marker and re-teach `aruco`. |
+| Cup stops above the shape / vacuum doesn't hold | Re-teach `shapeTop` with the cup pressed onto a shape until the vacuum holds. If it still slips, set `EXTRA_SQUEEZE` to 0.5–1. |
 | `no marker` printed on the Pi | Marker not in view, covered or badly lit. |
-| Shapes detected but the robot goes to the wrong place | Marker X/Y in Python ≠ `aruco` target, or the paper/camera moved. Re-teach `aruco` and update Python. |
+| Shapes detected but the robot goes to the wrong place | The paper, marker or camera moved. Re-teach `aruco` (cup on the marker centre). |
 | Robot picks the right spot but places in the wrong slot | Re-teach `p20` (circle), `p30` (star), `p40` (square) in `wobj1`. |
 | Every shape skipped as *"Unknown shape"* | Shape names don't match: RAPID must compare lowercase `circle` / `star` / `square`. |
 | Triangle or hexagon gets picked | The geometry check in the vision script is off or needs tuning. Check the printed `corners=… circle_fill=…` values. |
