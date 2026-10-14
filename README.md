@@ -42,8 +42,8 @@ There's **one Ethernet cable** going to the robot controller, and it's used for 
 | File | Where it runs | What it does |
 |---|---|---|
 | [`main_vision_finale.py`](main_vision_finale.py) | Raspberry Pi | **The vision main script.** Grabs frames from the Basler camera, finds the ArUco marker, detects shapes with YOLO, rejects anything that isn't a circle/square/star (e.g. triangles, hexagons), identifies each shape's **colour**, converts pixels to robot X/Y (mm) and answers the robot over TCP. Prints the **inference time** of every frame and logs it to `inference_log.csv`. Also serves the live video feed. |
-| `mary_vision_common_with_yolo.py` *(on the Pi)* | Raspberry Pi | Shared helpers: ArUco marker detection (`DICT_5X5_100`, **100 mm** marker), pixel→mm scale, workspace utilities. |
-| `mary_best.onnx` *(on the Pi)* | Raspberry Pi | The trained YOLOv8 model (classes: `circle`, `square`, `star`). Loaded with OpenCV DNN, so **no Ultralytics needed on the Pi**. |
+| `vision_common_with_yolo.py` *(on the Pi)* | Raspberry Pi | Shared helpers: ArUco marker detection (`DICT_5X5_100`, **100 mm** marker), pixel→mm scale, workspace utilities. |
+| `best.onnx` *(on the Pi)* | Raspberry Pi | The trained YOLOv8 model (classes: `circle`, `square`, `star`). Loaded with OpenCV DNN, so **no Ultralytics needed on the Pi**. |
 | [`robot/MainModule.mod`](robot/MainModule.mod) | ABB controller | The robot program: asks the Pi which colours and shapes it sees, lets the operator choose on the FlexPendant, then picks that object and places it in its slot. Runs endless cycles. |
 | `ServerComms` module *(on the controller)* | ABB controller | Socket helpers the main module uses (`RobotAsClientConnect`, `RobotClienSendMessage`, `RobotClientReciveMessage`). |
 
@@ -172,7 +172,7 @@ sudo nmcli con up "Wired connection 1"
 
 ### 4. Run
 
-These files must be in the same folder: `MainVision_finale.py`, `mary_vision_common_with_yolo.py` and `mary_best.onnx`.
+These files must be in the same folder: `MainVision_finale.py`, `vision_common_with_yolo.py` and `best.onnx`.
 
 ```bash
 cd ~/Downloads
