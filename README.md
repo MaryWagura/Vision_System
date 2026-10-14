@@ -83,6 +83,14 @@ Each time you open a new terminal on the Pi, activate the environment first:
 source ~/vision-env/bin/activate
 ```
 
+### 🐧 Raspberry Pi / Linux command cheat sheet
+
+| Command | What it means | Example |
+|---|---|---|
+| `cd` | Change directory (move into a folder). | `cd ~/Downloads` |
+| `ls` | List files and folders in the current directory. | `ls -l` |
+| `sudo` | Runs a command with administrator (root) privileges, so it should be used carefully. For this project, `sudo apt update` refreshes the Raspberry Pi package list before installing or updating software. | `sudo apt update`<br>`sudo apt install python3-venv` |
+
 ### Windows desktop
 - **RobotStudio**, to edit and load the RAPID code on the controller.
 - **OpenSSH client**, built into Windows 10/11. Check by typing `ssh` in PowerShell.
