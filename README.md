@@ -2,7 +2,7 @@
 
 An AI-based computer vision system for automated pick and place (INA700 project).
 
-A camera above the table spots shapes on the paper, a Raspberry Pi works out **what** each shape is and **where** it is, and an ABB robot picks it up and drops it into its matching slot on the designated-positions board.
+A camera above the table spots shapes on the paper, a Raspberry Pi works out **what** each shape is and **where** it is, and an ABB robot picks it up and drops it into its matching slot on the designated board.
 
 ![Cell setup: camera, robot, Raspberry Pi and designated positions](docs/setup.webp)
 
@@ -31,7 +31,7 @@ There's **one Ethernet cable** going to the robot controller, and it's used for 
 | ✏️ **Edit the RAPID code** in RobotStudio | 🖥️ the **Windows desktop** |
 | ▶️ **Run the robot** with vision | 🍓 the **Raspberry Pi** |
 
-> ⚠️ **Always move the cable back to the Raspberry Pi before running the robot.** If the cable is still in the desktop, the robot can't reach the Pi at `.207` and the program will stall at "Requesting targets from camera...".
+> ⚠️ **Always move the cable back to the Raspberry Pi before running the robot.** If the cable is still in the desktop, the robot can't reach the Pi at `.207` and the program will stall at "Requesting...".
 
 ---
 
@@ -41,10 +41,10 @@ There's **one Ethernet cable** going to the robot controller, and it's used for 
 
 | File | Where it runs | What it does |
 |---|---|---|
-| [`main_vision_finale.py`](main_vision_finale.py) | Raspberry Pi | **The vision main script.** Grabs frames from the Basler camera, finds the ArUco marker, detects shapes with YOLO, rejects anything that isn't a circle/square/star (e.g. triangles, hexagons), identifies each shape's **colour**, converts pixels to robot X/Y (mm) and answers the robot over TCP. Prints the **inference time** of every frame and logs it to `inference_log.csv`. Also serves the live video feed. |
-| `vision_common_with_yolo.py` *(on the Pi)* | Raspberry Pi | Shared helpers: ArUco marker detection (`DICT_5X5_100`, **100 mm** marker), pixel→mm scale, workspace utilities. |
-| `best.onnx` *(on the Pi)* | Raspberry Pi | The trained YOLOv8 model (classes: `circle`, `square`, `star`). Loaded with OpenCV DNN, so **no Ultralytics needed on the Pi**. |
-| [`robot/MainModule.mod`](robot/MainModule.mod) | ABB controller | The robot program: asks the Pi which colours and shapes it sees, lets the operator choose on the FlexPendant, then picks that object and places it in its slot. Runs endless cycles. |
+| [`main_vision_finale.py`](main_vision_finale.py) | Raspberry Pi | **The vision main script.** Grabs frames from the Basler camera, finds the ArUco marker, detects shapes with YOLO, rejects anything outside the workspace, and serves the camera feed. |
+| `mary_vision_common_with_yolo.py` *(on the Pi)* | Raspberry Pi | Shared helpers: ArUco marker detection (`DICT_5X5_100`, **100 mm** marker), pixel→mm scale, workspace utilities. |
+| `mary_best.onnx` *(on the Pi)* | Raspberry Pi | The trained YOLOv8 model (classes: `circle`, `square`, `star`). Loaded with OpenCV DNN, so **no Ultralytics needed on the Pi**. |
+| [`robot/MainModule.mod`](robot/MainModule.mod) | ABB controller | The robot program: asks the Pi which colours and shapes it sees, lets the operator choose on the FlexPendant, then picks that object and places it in the matching slot. |
 | `ServerComms` module *(on the controller)* | ABB controller | Socket helpers the main module uses (`RobotAsClientConnect`, `RobotClienSendMessage`, `RobotClientReciveMessage`). |
 
 > Files marked *(on the Pi)* or *(on the controller)* aren't in this repo yet. Please add them so the team has one shared copy.
@@ -82,6 +82,60 @@ Each time you open a new terminal on the Pi, activate the environment first:
 ```bash
 source ~/vision-env/bin/activate
 ```
+
+### 🐧 Raspberry Pi / Linux command cheat sheet
+
+These are the commands used most often when setting up and running the vision system.
+
+| Command | What it means | Example |
+|---|---|---|
+| `cd` | **Change directory.** Enters a folder so commands run from that location. | `cd ~/Downloads` |
+| `cd ..` | Moves up one level to the parent directory. | `cd ..` |
+| `cd ~` | Returns to your home directory. | `cd ~` |
+| `ls` | **List.** Shows the files and folders in the current directory. | `ls` |
+| `ls -l` | Shows files in a detailed list, including permissions, owner and file size. | `ls -l` |
+| `ls -a` | Shows all files, including hidden files whose names start with `.`. | `ls -a` |
+| `pwd` | **Print working directory.** Shows the full path of the directory you are currently in. | `pwd` |
+| `sudo` | Runs a command with administrator privileges. For this project, `sudo apt update` refreshes the Raspberry Pi's package list before software is installed or updated. Use `sudo` carefully because it can change system-wide settings. | `sudo apt update`<br>`sudo apt install python3-venv` |
+| `mkdir` | Creates a new directory (folder). | `mkdir vision-project` |
+| `cp` | Copies a file or folder. | `cp model.onnx ~/Downloads/` |
+| `mv` | Moves or renames a file or folder. | `mv best.onnx mary_best.onnx` |
+| `rm` | Removes a file. Be careful because deleted files may not be recoverable. | `rm old_log.csv` |
+| `nano` | Opens a simple terminal text editor. Press `Ctrl+O` to save and `Ctrl+X` to exit. | `nano settings.py` |
+| `source` | Activates a script or virtual environment in the current terminal. | `source ~/vision-env/bin/activate` |
+| `python3` | Runs Python 3 programs. | `python3 main_vision_finale.py` |
+| `pip` | Installs Python packages. | `pip install flask` |
+| `ssh` | Connects to the Raspberry Pi remotely from another computer. | `ssh pi@192.168.140.113` |
+| `scp` | Copies files between computers over SSH. | `scp model.onnx pi@192.168.140.113:~/Downloads/` |
+| `ping` | Tests whether another device can be reached over the network. | `ping 192.168.125.1` |
+| `ip addr` | Displays the Pi's network interfaces and IP addresses. | `ip addr show eth0` |
+| `ss` | Shows network connections and listening ports. Useful for checking ports `5000` and `8080`. | `ss -tlnp` |
+| `clear` | Clears the terminal window. | `clear` |
+| `history` | Shows previously entered commands. | `history` |
+
+#### Useful examples for this project
+
+```bash
+# See where you are
+pwd
+
+# Go to the folder containing the vision files
+cd ~/Downloads
+
+# Check that the required files are present
+ls -l
+
+# Activate the Python virtual environment
+source ~/vision-env/bin/activate
+
+# Start the vision program
+python3 main_vision_finale.py
+
+# Stop a running program
+Ctrl + C
+```
+
+> **Important:** `sudo` gives a command administrator-level access. Use it only when necessary, and check the command carefully before pressing Enter. Commands such as `sudo rm` can permanently delete files or damage the system.
 
 ### Windows desktop
 - **RobotStudio**, to edit and load the RAPID code on the controller.
@@ -172,7 +226,7 @@ sudo nmcli con up "Wired connection 1"
 
 ### 4. Run
 
-These files must be in the same folder: `MainVision_finale.py`, `vision_common_with_yolo.py` and `best.onnx`.
+These files must be in the same folder: `MainVision_finale.py`, `mary_vision_common_with_yolo.py` and `mary_best.onnx`.
 
 ```bash
 cd ~/Downloads
@@ -287,7 +341,7 @@ Enter a number:  2
 | `REQUEST_COORDS,red,star` | `star,x,y,angle` (or `NO_TARGET,0,0,0`) |
 
 - **Colours:** black, red, green, blue, white. **Shapes:** circle (→ `p20`), star (→ `p30`), square (→ `p40`).
-- **Two identical objects** (e.g. two red squares): the one closest to the marker is picked first; choose it again next cycle for the other. Extra shapes in the same slot are released 10 mm higher each time, up to 3 per slot.
+- **Two identical objects** (e.g. two red squares): the one closest to the marker is picked first; choose it again next cycle for the other. Extra shapes in the same slot are released 10 mm higher each time.
 - **After emptying the board**, choose **9** in the colour menu to reset the slot counters.
 - **0** refreshes the menu, e.g. after putting new shapes on the paper.
 
