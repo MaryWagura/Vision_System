@@ -17,7 +17,7 @@ A camera above the table spots shapes on the paper, a Raspberry Pi works out **w
 | ABB robot controller | `192.168.125.1` | RobotStudio / FlexPendant connection |
 
 - Live camera feed (while the vision script runs): **http://192.168.140.113:8080**
-- The vision script listens on **all** the Pi's network interfaces (`HOST = "0.0.0.0"`), so it never needs editing when the Pi's IP changes. Only the RAPID side names the address:
+- The vision script listens on the Pi's robot-network address (`HOST = "192.168.125.207"` in `main_vision_yolo_without_ultralynics.py`), so the Pi must own that address on `eth0`. The RAPID side connects to the same address:
   - RAPID `ServerComms` module: `SocketConnect robotClient, "192.168.125.207", 5000;`
 
 ---
@@ -37,27 +37,83 @@ There's **one Ethernet cable** going to the robot controller, and it's used for 
 
 ## 🗂️ What's in this project
 
-### Running the cell (the files that matter day to day)
+The cell runs from **two folders**: [`robot/`](robot) (the ABB controller side) and [`train_with_YOLO/`](train_with_YOLO) (the Raspberry Pi vision side and the model training). The other folders are older experiments and helper tools, kept for reference.
 
-| File | Where it runs | What it does |
-|---|---|---|
-| [`train_with_XGBoost/main_vision.py`](train_with_XGBoost/main_vision.py) | Raspberry Pi | **The vision main script.** Grabs frames from the Basler camera, finds the ArUco marker, detects shapes with YOLO, rejects anything outside the workspace, and serves the camera feed. |
-| `mary_vision_common_with_yolo.py` *(on the Pi)* | Raspberry Pi | Shared helpers: ArUco marker detection (`DICT_5X5_100`, **100 mm** marker), pixel→mm scale, workspace utilities. |
-| `mary_best.onnx` *(on the Pi)* | Raspberry Pi | The trained YOLOv8 model (classes: `circle`, `square`, `star`). Loaded with OpenCV DNN, so **no Ultralytics needed on the Pi**. |
-| [`robot/MainModule.mod`](robot/MainModule.mod) | ABB controller | The robot program: asks the Pi which colours and shapes it sees, lets the operator choose on the FlexPendant, then picks that object and places it in the matching slot. |
-| `ServerComms` module *(on the controller)* | ABB controller | Socket helpers the main module uses (`RobotAsClientConnect`, `RobotClienSendMessage`, `RobotClientReciveMessage`). |
+```
+Vision_System/
+├── robot/                  ← ⭐ used: RAPID code for the ABB controller
+├── train_with_YOLO/        ← ⭐ used: vision script, YOLO model and training notebook
+├── camera_setup/           helper scripts: check the camera view, collect training images
+├── train_with_XGBoost/     old experiment (contour features + XGBoost)
+├── train_with_random_forest/ old experiment (contour features + Random Forest)
+└── docs/                   images for this README
+```
 
-> Files marked *(on the Pi)* or *(on the controller)* aren't in this repo yet. Please add them so the team has one shared copy.
+### 🤖 `robot/` (runs on the ABB controller)
 
-### Training & data collection
+| File | What it does |
+|---|---|
+| [`robot/MainModule.mod`](robot/MainModule.mod) | **The robot program.** Asks the Pi which colours and shapes it sees, lets the operator choose on the FlexPendant, then picks that object and places it in the matching slot. |
+| [`robot/ServerCommuncatio.txt`](robot/ServerCommuncatio.txt) | The `ServerCommuncatio` RAPID module (system module): socket helpers the main module uses to talk to the Pi (`RobotAsClientConnect`, `RobotClienSendMessage`, `RobotClientReciveMessage`, …). |
+
+### 🍓 `train_with_YOLO/` (runs on the Raspberry Pi + training)
+
+| File | What it does |
+|---|---|
+| [`main_vision_yolo_without_ultralynics.py`](train_with_YOLO/main_vision_yolo_without_ultralynics.py) | **The vision main script (the one we run on the Pi).** Grabs frames from the Basler camera, finds the ArUco marker, detects shapes with YOLO through OpenCV DNN, rejects anything outside the workspace, answers the robot on port **5000** and serves the live feed on port **8080**. |
+| [`vision_common_with_yolo.py`](train_with_YOLO/vision_common_with_yolo.py) | Shared helpers imported by the main script: ArUco marker detection (`DICT_5X5_100`, **100 mm** marker), pixel→mm scale, pixel→robot offset, workspace utilities. |
+| [`best.onnx`](train_with_YOLO/best.onnx) | The trained YOLOv8 model (classes: `circle`, `square`, `star`). Loaded with OpenCV DNN, so **no Ultralytics or PyTorch needed on the Pi**. |
+| [`YOLO_Train.ipynb`](train_with_YOLO/YOLO_Train.ipynb) | Kaggle notebook: prepares the labelled dataset, trains the YOLOv8 model and exports it to `best.onnx`. |
+| `data.yaml`, `args.yaml` | Dataset and training settings used by the notebook. |
+| `results.csv`, `Box*_curve.png`, `confusion_matrix*.png`, `labels.jpg` | Training results and plots (useful for the report). |
+| `yolov8n.pt`, `yolo26n.pt` | Pretrained YOLO weights the training starts from. Not needed on the Pi. |
+| `main_vision_yolo_with_ultralynics.py` | Alternative vision script that uses the `ultralytics` package. Not used on the Pi. |
+| `vision_common_with_yolo.py.txt` | Plain-text copy of `vision_common_with_yolo.py`. |
+
+### 🧰 Other folders (reference / helpers)
 
 | File | What it does |
 |---|---|
 | [`camera_setup/camera_setup.py`](camera_setup/camera_setup.py) | Starts the Basler camera and shows the live view in the browser. Use it to check the camera position. |
-| `camera_setup/capture_final_images.py` | Collects training images from the Basler camera (saves a frame every 10 s into `dataset/`, with a live preview on port 5000). |
-| `train_with_YOLO/YOLO_Train.ipynb` | Kaggle notebook: prepares the labelled dataset and trains the YOLOv8 model, then exports it to ONNX (`best.onnx` → renamed `mary_best.onnx` on the Pi). |
-| `train_with_XGBoost/mv_more_data.ipynb`, `train_with_XGBoost/Machine-Vision-v2.ipynb`, `train_with_random_forest`, `Machine-Vision-1`, `Vision_Train_Model` | Earlier experiments (classic contour features + Random Forest / XGBoost). Kept for reference. |
-| `train_with_XGBoost/vision_common.py`, `shape_classifier.pkl` | Old (pre-YOLO) shared vision code and Random Forest model. Not used by the current YOLO pipeline. |
+| [`camera_setup/capture_final_images.py`](camera_setup/capture_final_images.py) | Collects training images from the Basler camera (saves a frame every 10 s into `dataset/`, with a live preview on port 5000). |
+| `train_with_XGBoost/`, `train_with_random_forest/` | Earlier experiments (classic contour features + XGBoost / Random Forest), including the old `main_vision.py`, `vision_common.py` and `shape_classifier.pkl`. Not used by the current YOLO pipeline. |
+
+---
+
+## 📥 Files you need to run the project
+
+You **don't need the whole repo** to run the cell. Download/copy only these files:
+
+| File (in this repo) | Copy it to… | Notes |
+|---|---|---|
+| [`train_with_YOLO/main_vision_yolo_without_ultralynics.py`](train_with_YOLO/main_vision_yolo_without_ultralynics.py) | 🍓 Raspberry Pi, e.g. `~/Downloads/` | The script you start. |
+| [`train_with_YOLO/vision_common_with_yolo.py`](train_with_YOLO/vision_common_with_yolo.py) | 🍓 Raspberry Pi, **same folder** | Imported by the main script; keep this exact file name. |
+| [`train_with_YOLO/best.onnx`](train_with_YOLO/best.onnx) | 🍓 Raspberry Pi, **same folder** | The model; the script loads it as `best.onnx`, so don't rename it. |
+| [`robot/MainModule.mod`](robot/MainModule.mod) | 🤖 ABB controller (load in RobotStudio) | The main robot program. |
+| [`robot/ServerCommuncatio.txt`](robot/ServerCommuncatio.txt) | 🤖 ABB controller (load in RobotStudio) | Socket module needed by `MainModule`. |
+
+**On the Pi**, the three files must sit together in one folder:
+
+```
+~/Downloads/
+├── main_vision_yolo_without_ultralynics.py
+├── vision_common_with_yolo.py
+└── best.onnx
+```
+
+Copy them from Windows with one command (PowerShell, after downloading them into your `Downloads` folder):
+
+```powershell
+scp "$env:USERPROFILE\Downloads\main_vision_yolo_without_ultralynics.py" "$env:USERPROFILE\Downloads\vision_common_with_yolo.py" "$env:USERPROFILE\Downloads\best.onnx" pi@192.168.140.113:~/Downloads/
+```
+
+Then check they arrived:
+
+```bash
+ls -l ~/Downloads/main_vision_yolo_without_ultralynics.py ~/Downloads/vision_common_with_yolo.py ~/Downloads/best.onnx
+```
+
+**On the robot controller**, open the station in RobotStudio (cable in the Windows desktop, see [the cable swap](#-the-ethernet-cable-swap-important)), load `MainModule.mod` and `ServerCommuncatio.txt` into the controller's task, apply the changes, then move the cable back to the Pi.
 
 ---
 
@@ -99,11 +155,11 @@ These are the commands used most often when setting up and running the vision sy
 | `sudo` | Runs a command with administrator privileges. For this project, `sudo apt update` refreshes the Raspberry Pi's package list before software is installed or updated. Use `sudo` carefully because it can change system-wide settings. | `sudo apt update`<br>`sudo apt install python3-venv` |
 | `mkdir` | Creates a new directory (folder). | `mkdir vision-project` |
 | `cp` | Copies a file or folder. | `cp model.onnx ~/Downloads/` |
-| `mv` | Moves or renames a file or folder. | `mv best.onnx mary_best.onnx` |
+| `mv` | Moves or renames a file or folder. | `mv best.onnx best_old.onnx` |
 | `rm` | Removes a file. Be careful because deleted files may not be recoverable. | `rm old_log.csv` |
 | `nano` | Opens a simple terminal text editor. Press `Ctrl+O` to save and `Ctrl+X` to exit. | `nano settings.py` |
 | `source` | Activates a script or virtual environment in the current terminal. | `source ~/vision-env/bin/activate` |
-| `python3` | Runs Python 3 programs. | `python3 main_vision_finale.py` |
+| `python3` | Runs Python 3 programs. | `python3 main_vision_yolo_without_ultralynics.py` |
 | `pip` | Installs Python packages. | `pip install flask` |
 | `ssh` | Connects to the Raspberry Pi remotely from another computer. | `ssh pi@192.168.140.113` |
 | `scp` | Copies files between computers over SSH. | `scp model.onnx pi@192.168.140.113:~/Downloads/` |
@@ -129,7 +185,7 @@ ls -l
 source ~/vision-env/bin/activate
 
 # Start the vision program
-python3 main_vision_finale.py
+python3 main_vision_yolo_without_ultralynics.py
 
 # Stop a running program
 Ctrl + C
@@ -226,11 +282,11 @@ sudo nmcli con up "Wired connection 1"
 
 ### 4. Run
 
-These files must be in the same folder: `MainVision_finale.py`, `mary_vision_common_with_yolo.py` and `mary_best.onnx`.
+These files must be in the same folder: `main_vision_yolo_without_ultralynics.py`, `vision_common_with_yolo.py` and `best.onnx` (see [Files you need to run the project](#-files-you-need-to-run-the-project)).
 
 ```bash
 cd ~/Downloads
-python3 MainVision_finale.py
+python3 main_vision_yolo_without_ultralynics.py
 ```
 
 Expected startup output:
@@ -244,7 +300,7 @@ Camera active. Waiting for robot...
 
 Open the live feed from a PC on the same Wi-Fi: `http://192.168.140.112:8080`. Stop the script with `Ctrl + C`.
 
-The script listens on every interface (`HOST = "0.0.0.0"`), so it also works for testing without the robot.
+To test without the robot, set `HOST = "0.0.0.0"` in the script so it listens on every interface.
 
 ### 5. Troubleshooting
 
@@ -272,7 +328,7 @@ scp "$env:USERPROFILE\Downloads\best.onnx" student@192.168.140.113:~/Downloads/
 
 **Copy several files at once:**
 ```powershell
-scp "$env:USERPROFILE\Downloads\main_vision_finale.py" "$env:USERPROFILE\Downloads\vision_common_with_yolo.py" pi@192.168.140.113:~/Downloads/
+scp "$env:USERPROFILE\Downloads\main_vision_yolo_without_ultralynics.py" "$env:USERPROFILE\Downloads\vision_common_with_yolo.py" pi@192.168.140.113:~/Downloads/
 ```
 
 **Copy a whole folder:**
@@ -309,7 +365,7 @@ Stop it with `Ctrl + C` before starting the vision script, because both use the 
    ssh pi@192.168.140.113
    source ~/vision-env/bin/activate
    cd ~/Downloads
-   python3 main_vision_color.py
+   python3 main_vision_yolo_without_ultralynics.py
    ```
    Wait for `TCP Server listening on 192.168.125.207:5000` and `Camera active`.
 3. 👀 **Check the live feed** at http://192.168.140.113:8080. You should see the red **Origin** dot on the marker and green dots on the shapes.
