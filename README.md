@@ -43,6 +43,7 @@ The cell runs from **two folders**: [`robot/`](robot) (the ABB controller side) 
 Vision_System/
 ├── robot/                  ← ⭐ used: RAPID code for the ABB controller
 ├── train_with_YOLO/        ← ⭐ used: vision script, YOLO model and training notebook
+│   └── images/             training images and the Roboflow-labelled dataset
 ├── camera_setup/           helper scripts: check the camera view, collect training images
 ├── train_with_XGBoost/     old experiment (contour features + XGBoost)
 ├── train_with_random_forest/ old experiment (contour features + Random Forest)
@@ -69,6 +70,7 @@ Vision_System/
 | `yolov8n.pt`, `yolo26n.pt` | Pretrained YOLO weights the training starts from. Not needed on the Pi. |
 | `main_vision_yolo_with_ultralynics.py` | Alternative vision script that uses the `ultralytics` package. Not used on the Pi. |
 | `vision_common_with_yolo.py.txt` | Plain-text copy of `vision_common_with_yolo.py`. |
+| [`images/`](train_with_YOLO/images) | The training images and the labels made in **Roboflow** (see *Training images & labelling* below). Not needed on the Pi. |
 
 ### 🧰 Other folders (reference / helpers)
 
@@ -77,6 +79,26 @@ Vision_System/
 | [`camera_setup/camera_setup.py`](camera_setup/camera_setup.py) | Starts the Basler camera and shows the live view in the browser. Use it to check the camera position. |
 | [`camera_setup/capture_final_images.py`](camera_setup/capture_final_images.py) | Collects training images from the Basler camera (saves a frame every 10 s into `dataset/`, with a live preview on port 5000). |
 | `train_with_XGBoost/`, `train_with_random_forest/` | Earlier experiments (classic contour features + XGBoost / Random Forest), including the old `main_vision.py`, `vision_common.py` and `shape_classifier.pkl`. Not used by the current YOLO pipeline. |
+
+---
+
+## 🖼️ Training images & labelling (Roboflow)
+
+The images used to train the YOLO model are in [`train_with_YOLO/images/`](train_with_YOLO/images). They were taken with the Basler camera in the cell (using [`camera_setup/capture_final_images.py`](camera_setup/capture_final_images.py)), and the **labelling was done with [Roboflow](https://roboflow.com)**.
+
+| Folder | What's in it |
+|---|---|
+| [`images/cleaned_labelled_dataset/`](train_with_YOLO/images/cleaned_labelled_dataset) | All **642** cleaned training images (circles, squares and stars at different positions and heights, alone or together, some with the ArUco marker). The file name says which shapes are in the picture, e.g. `capture__star_pos_3_2.jpg` or `square_star_circle_10.png`. |
+| [`images/to_label/`](train_with_YOLO/images/to_label) | The **63** images the notebook couldn't label on its own (mostly pictures with several shapes), which were sent to Roboflow. |
+| [`images/test.v1i.yolov8/`](train_with_YOLO/images/test.v1i.yolov8) | Those images **labelled in Roboflow** and exported in YOLOv8 format: `train/images/` + `train/labels/` (one `.txt` per image, one box per shape), plus `data.yaml`. Classes: `circle`, `square`, `star`. Roboflow project: [mary-wagura/test-8d5er](https://universe.roboflow.com/mary-wagura/test-8d5er) (CC BY 4.0). |
+
+**How the dataset was built:**
+1. 📸 Capture images of the shapes on the paper with the Basler camera.
+2. 🏷️ In [`YOLO_Train.ipynb`](train_with_YOLO/YOLO_Train.ipynb), most images are labelled automatically: each shape's box comes from its contour and its class from the file name.
+3. 🖍️ Images the notebook couldn't label with confidence were copied to `to_label/`, uploaded to **Roboflow**, labelled there by drawing a box around each shape, and exported as YOLOv8 (`test.v1i.yolov8/`). Roboflow resized them to 512×512 and added no augmentation.
+4. 🧠 Both sets are combined, split 80/20 into train/val, and used to train YOLOv8, which is exported to `best.onnx`.
+
+> To label new images: upload them to the Roboflow project, draw a box around each shape with the class `circle`, `square` or `star`, then **Export → YOLOv8** and add the export to the notebook's input data.
 
 ---
 
