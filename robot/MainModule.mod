@@ -5,25 +5,18 @@ MODULE MainModule
 	CONST robtarget p20:=[[264.56,-154.21,11.15],[0.0702991,0.010664,-0.997237,-0.0214902],[-1,-1,-1,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
 	CONST robtarget p30:=[[205.60,-218.52,11.68],[0.07035,0.0106954,-0.997232,-0.0215566],[-1,-1,-1,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
 	CONST robtarget p40:=[[258.49,-281.88,10.53],[0.0703828,0.0106784,-0.997229,-0.0215889],[-1,-1,-1,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
-	! ===== CALIBRATION: teach these two on the FlexPendant (Modify Position), never edit numbers =====
-	! aruco    : cup centred on the ArUco marker, touching the paper. Python sends positions
-	!            relative to the marker, so this is the only X/Y calibration in the whole system.
 	CONST robtarget aruco:=[[118.64,193.32,-5.63],[0.0702491,0.0107088,-0.997241,-0.0214741],[0,0,0,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
-	! shapeTop : cup on top of a real shape, pressed until the vacuum holds it (valve on).
-	!            Its Z is the pick height. Only its Z is used; X/Y don't matter.
-	CONST robtarget shapeTop:=[[118.64,193.32,4.37],[0.0702491,0.0107088,-0.997241,-0.0214741],[0,0,0,0],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
-    ! --- Heights (mm, wobj1) ---
-    CONST num SHAPE_THICK := 10;    ! all shapes are 1 cm thick (used for slot stacking)
-    CONST num EXTRA_SQUEEZE := 0;   ! extra mm below shapeTop; leave 0 if shapeTop was taught sealed
-    CONST num MIN_ABOVE_PAPER := 2; ! crash guard: pick never closer than this to the paper (aruco Z)
+
+	 ! --- Heights (mm, wobj1) ---
+    CONST num PAPER_Z := 0;         ! measured: cup sucked onto the paper
+    CONST num SHAPE_THICK := 10;    ! all shapes are 1 cm thick
+    CONST num SQUEEZE := 0;         ! already included in PAPER_Z measurement
+    CONST num MIN_ABOVE_PAPER := 2; ! crash guard: never closer to the paper
     CONST num PLACE_DZ := 0;        ! extra release height above p20-p40
-    CONST num APPROACH_DZ := 30;    ! slow straight-down approach to the shape
-    CONST num VACUUM_WAIT := 1.0;   ! s to let the vacuum build before lifting
 
     ! --- Allowed pick area, relative to the marker centre (mm) ---
-    ! X = image up/down (paper's short side), Y = image left/right (paper's long side)
-    CONST num REACH_X := 140;
-    CONST num REACH_Y := 200;
+    CONST num REACH_X := 200;
+    CONST num REACH_Y := 140;
 
     ! --- Slot bookkeeping (how many shapes are already in each slot) ---
     ! PERS: survives a program restart. Reset with option 9 after emptying the board.
@@ -36,12 +29,11 @@ MODULE MainModule
         MoveJ p10, v1000, fine, tool1\WObj:=wobj1;
 
         TPWrite "Moving to pick object";
-        MoveL Offs(pickTarget, 0, 0, APPROACH_DZ), v500, fine, tool1\WObj:=wobj1;
-        MoveL pickTarget, v50, fine, tool1\WObj:=wobj1;
+        MoveL pickTarget, v500, fine, tool1\WObj:=wobj1;
 
         TPWrite "Vacuum ON";
         Set doValve1;
-        WaitTime VACUUM_WAIT;
+        WaitTime 0.5;
 
         MoveJ p10, v1000, fine, tool1\WObj:=wobj1;
 
@@ -235,10 +227,9 @@ MODULE MainModule
                             ENDIF
 
                             ! Pick height: top face of a 1 cm shape
-                            ! Pick height = taught shapeTop Z (works for any sign of the Z values)
-                            pickZ := shapeTop.trans.z - EXTRA_SQUEEZE;
-                            IF pickZ < aruco.trans.z + MIN_ABOVE_PAPER THEN
-                                pickZ := aruco.trans.z + MIN_ABOVE_PAPER;
+                            pickZ := aruco.trans.z + SHAPE_THICK - SQUEEZE;
+                            IF pickZ <  aruco.trans.z + MIN_ABOVE_PAPER THEN
+                                pickZ :=  aruco.trans.z + MIN_ABOVE_PAPER;
                             ENDIF
 
                             IF ok_x = FALSE OR ok_y = FALSE THEN
@@ -247,7 +238,7 @@ MODULE MainModule
                             ELSEIF known_shape = FALSE OR str_shape <> shape THEN
                                 TPWrite "Unexpected answer - skipped: " + str_shape;
                                 WaitTime 2;
-                            ELSEIF Abs(val_x) > REACH_X OR Abs(val_y) > REACH_Y THEN
+                            ELSEIF Abs(val_x - aruco.trans.x) > REACH_X OR Abs(val_y - aruco.trans.y) > REACH_Y THEN
                                 TPWrite "Target outside pick area - skipped";
                                 WaitTime 2;
                             ELSEIF stackN >= MAX_PER_SLOT THEN
@@ -255,8 +246,7 @@ MODULE MainModule
                                 WaitTime 2;
                             ELSE
                                 dynamicPickTarget := aruco;
-                                ! Python sends mm offsets from the marker -> add the taught aruco X/Y
-                                dynamicPickTarget.trans := [aruco.trans.x + val_x, aruco.trans.y + val_y, pickZ];
+                                dynamicPickTarget.trans := [val_x, val_y, pickZ];
                                 dynamicPickTarget := RelTool(dynamicPickTarget, 0, 0, 0 \Rz:=val_angle);
 
                                 ! Release each extra shape one thickness higher

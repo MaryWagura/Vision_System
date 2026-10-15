@@ -41,7 +41,7 @@ There's **one Ethernet cable** going to the robot controller, and it's used for 
 
 | File | Where it runs | What it does |
 |---|---|---|
-| [`main_vision_finale.py`](main_vision_finale.py) | Raspberry Pi | **The vision main script.** Grabs frames from the Basler camera, finds the ArUco marker, detects shapes with YOLO, rejects anything outside the workspace, and serves the camera feed. |
+| [`train_with_XGBoost/main_vision.py`](train_with_XGBoost/main_vision.py) | Raspberry Pi | **The vision main script.** Grabs frames from the Basler camera, finds the ArUco marker, detects shapes with YOLO, rejects anything outside the workspace, and serves the camera feed. |
 | `mary_vision_common_with_yolo.py` *(on the Pi)* | Raspberry Pi | Shared helpers: ArUco marker detection (`DICT_5X5_100`, **100 mm** marker), pixel→mm scale, workspace utilities. |
 | `mary_best.onnx` *(on the Pi)* | Raspberry Pi | The trained YOLOv8 model (classes: `circle`, `square`, `star`). Loaded with OpenCV DNN, so **no Ultralytics needed on the Pi**. |
 | [`robot/MainModule.mod`](robot/MainModule.mod) | ABB controller | The robot program: asks the Pi which colours and shapes it sees, lets the operator choose on the FlexPendant, then picks that object and places it in the matching slot. |
@@ -53,11 +53,11 @@ There's **one Ethernet cable** going to the robot controller, and it's used for 
 
 | File | What it does |
 |---|---|
-| [`camera_setup.py`](camera_setup.py) | Starts the Basler camera and shows the live view in the browser. Use it to check the camera position. |
-| `capture_final_images.py` | Collects training images from the Basler camera (saves a frame every 10 s into `dataset/`, with a live preview on port 5000). |
-| `YOLO_Train.ipynb` | Kaggle notebook: prepares the labelled dataset and trains the YOLOv8 model, then exports it to ONNX (`best.onnx` → renamed `mary_best.onnx` on the Pi). |
-| `mv_more_data.ipynb`, `Machine-Vision-v2.ipynb`, `machine-vision-v1.ipynb`, `Machine-Vision-1`, `Vision_Train_Model` | Earlier experiments (classic contour features + Random Forest / XGBoost). Kept for reference. |
-| `vision_common.py`, `shape_classifier.pkl` | Old (pre-YOLO) shared vision code and Random Forest model. Not used by the current YOLO pipeline. |
+| [`camera_setup/camera_setup.py`](camera_setup/camera_setup.py) | Starts the Basler camera and shows the live view in the browser. Use it to check the camera position. |
+| `camera_setup/capture_final_images.py` | Collects training images from the Basler camera (saves a frame every 10 s into `dataset/`, with a live preview on port 5000). |
+| `train_with_YOLO/YOLO_Train.ipynb` | Kaggle notebook: prepares the labelled dataset and trains the YOLOv8 model, then exports it to ONNX (`best.onnx` → renamed `mary_best.onnx` on the Pi). |
+| `train_with_XGBoost/mv_more_data.ipynb`, `train_with_XGBoost/Machine-Vision-v2.ipynb`, `train_with_random_forest`, `Machine-Vision-1`, `Vision_Train_Model` | Earlier experiments (classic contour features + Random Forest / XGBoost). Kept for reference. |
+| `train_with_XGBoost/vision_common.py`, `shape_classifier.pkl` | Old (pre-YOLO) shared vision code and Random Forest model. Not used by the current YOLO pipeline. |
 
 ---
 
@@ -291,7 +291,7 @@ ssh pi@192.168.140.113
 
 ## 📷 Checking the camera view
 
-To just see what the camera sees (e.g. after moving the camera, paper or marker), run [`camera_setup.py`](camera_setup.py) on the Pi and open **http://192.168.140.113:8080**:
+To just see what the camera sees (e.g. after moving the camera, paper or marker), run [`camera_setup/camera_setup.py`](camera_setup/camera_setup.py) on the Pi and open **http://192.168.140.113:8080**:
 
 ```bash
 python3 camera_setup.py
