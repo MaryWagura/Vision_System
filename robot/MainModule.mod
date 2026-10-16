@@ -31,7 +31,7 @@ MODULE MainModule
     !                  turned exactly like the star slot on the board. Set once.
     ! STAR_ROT_SIGN  : 1 or -1. If a star placed after the fix is turned the wrong way
     !                  (about twice as far off), change this to -1.
-    CONST num STAR_SLOT_ANGLE := 0;
+    CONST num STAR_SLOT_ANGLE := 36;   ! slot wants the star point-down = 36 deg in the live feed
     CONST num STAR_ROT_SIGN := 1;
 
     PROC PickAndPlace(robtarget pickTarget, robtarget placeTarget)
