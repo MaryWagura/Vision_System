@@ -26,12 +26,11 @@ MODULE MainModule
     CONST num MAX_PER_SLOT := 3;    ! stop before a slot overflows
 
     ! --- Star rotation (so the star lines up with its slot when placed) ---
-    ! The Pi sends the star's angle in work-object axes, seen from above
-    ! (live-feed convention: a point towards image-down / robot +X = 0 deg).
-    ! STAR_SLOT_ANGLE is the angle a star has when it sits in the slot.
-    ! The slot wants the star point-down = 0 deg. Nothing else needs tuning:
-    ! the gripper headings are read from the aruco and slot targets themselves,
-    ! so re-teaching the slot target (even with a different rotation) is fine.
+    ! The Pi sends the star's angle CLOCKWISE FROM NORTH as seen in the live feed,
+    ! 0..72 deg (north = a point towards the top of the image; 0 = one point up).
+    ! STAR_SLOT_ANGLE = that angle for a star sitting in the slot. The slot's star
+    ! faces north, so it is 0. The gripper headings are read from the aruco and
+    ! slot targets themselves, so re-teaching the slot target (even rotated) is fine.
     CONST num STAR_SLOT_ANGLE := 0;
 
     ! Direction of the tool's X axis seen from above, in work-object axes (deg)
@@ -279,7 +278,7 @@ MODULE MainModule
                                     ! Turn the gripper so that, once it has moved to the slot
                                     ! target, the star sits at STAR_SLOT_ANGLE. The tool's Z
                                     ! axis points down, so RelTool +Rz turns the heading by -Rz.
-                                    rotDeg := WrapAngle(Heading(aruco.rot) - Heading(placeBase.rot) - val_angle + STAR_SLOT_ANGLE, 72);
+                                    rotDeg := WrapAngle(Heading(aruco.rot) - Heading(placeBase.rot) + val_angle - STAR_SLOT_ANGLE, 72);
                                 ELSE
                                     rotDeg := val_angle;
                                 ENDIF

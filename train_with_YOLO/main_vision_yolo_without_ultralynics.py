@@ -255,14 +255,14 @@ SHAPE_SYMMETRY_DEGREES = {
 }
 
 
-def star_angle_robot(cnt):
+def star_angle_cw_north(cnt):
     """
-    Rotation of a 5-pointed star in the ROBOT's axes (robot +X = image down,
-    robot +Y = image right), in degrees from -36 to +36.
+    Star rotation, measured CLOCKWISE FROM NORTH as seen in the live feed,
+    0..72 degrees (a star repeats every 72 deg). North = a point towards the
+    top of the image (robot -X); 0 = one point straight up.
 
-    minAreaRect can't be used for a star: its angle has nothing to do with the
-    star's real rotation. Instead, find the 5 tips (the points furthest from the
-    centre), take each tip's direction and average them with 72-degree symmetry.
+    Uses the 5 tips (points furthest from the centre): each tip's clockwise
+    angle from north, averaged with 72-degree symmetry.
     """
     m = cv2.moments(cnt)
     if m["m00"] == 0:
@@ -273,8 +273,8 @@ def star_angle_robot(cnt):
 
     tips = []
     for i in np.argsort(dist)[::-1]:
-        dx_img, dy_img = pts[i, 0] - cx, pts[i, 1] - cy
-        a = np.degrees(np.arctan2(dx_img, dy_img))   # angle from robot +X towards robot +Y
+        dx, dy = pts[i, 0] - cx, pts[i, 1] - cy
+        a = np.degrees(np.arctan2(dx, -dy))      # 0 = north (image up), 90 = east, clockwise
         if all(abs(((a - b + 180) % 360) - 180) > 20 for b in tips):
             tips.append(a)
         if len(tips) == 5:
@@ -282,14 +282,13 @@ def star_angle_robot(cnt):
 
     # Average with 72-degree symmetry: multiply by 5, average as unit vectors, divide by 5
     v = np.exp(1j * np.radians(np.array(tips) * 5)).mean()
-    angle = np.degrees(np.angle(v)) / 5          # -36 .. +36
-    return float(angle)
+    return float((np.degrees(np.angle(v)) / 5) % 72)
 
 
 def shape_angle(cnt, shape_name):
     """Gripper rotation for the shape, reduced by its symmetry."""
     if shape_name == "star":
-        return star_angle_robot(cnt)
+        return star_angle_cw_north(cnt)
     symmetry = SHAPE_SYMMETRY_DEGREES.get(shape_name)
     if not symmetry:
         return 0.0
