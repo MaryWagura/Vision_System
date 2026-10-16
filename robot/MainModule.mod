@@ -26,13 +26,31 @@ MODULE MainModule
     CONST num MAX_PER_SLOT := 3;    ! stop before a slot overflows
 
     ! --- Star rotation (so the star lines up with its slot when placed) ---
-    ! The Pi sends the star's rotation in robot axes (-36..+36 deg).
-    ! STAR_SLOT_ANGLE: the angle the live feed shows for a star lying on the paper
-    !                  turned exactly like the star slot on the board. Set once.
-    ! STAR_ROT_SIGN  : 1 or -1. If a star placed after the fix is turned the wrong way
-    !                  (about twice as far off), change this to -1.
-    CONST num STAR_SLOT_ANGLE := 36;   ! slot wants the star point-down = 36 deg in the live feed
-    CONST num STAR_ROT_SIGN := 1;
+    ! The Pi sends the star's angle in work-object axes, seen from above
+    ! (live-feed convention: a point towards image-down / robot +X = 0 deg).
+    ! STAR_SLOT_ANGLE is the angle a star has when it sits in the slot.
+    ! The slot wants the star point-down = 0 deg. Nothing else needs tuning:
+    ! the gripper headings are read from the aruco and slot targets themselves,
+    ! so re-teaching the slot target (even with a different rotation) is fine.
+    CONST num STAR_SLOT_ANGLE := 0;
+
+    ! Direction of the tool's X axis seen from above, in work-object axes (deg)
+    FUNC num Heading(orient o)
+        RETURN ATan2(2 * (o.q2 * o.q3 + o.q1 * o.q4), 1 - 2 * (o.q3 * o.q3 + o.q4 * o.q4));
+    ENDFUNC
+
+    ! Wrap an angle into (-period/2, +period/2]
+    FUNC num WrapAngle(num a, num period)
+        VAR num r;
+        r := a;
+        WHILE r > period / 2 DO
+            r := r - period;
+        ENDWHILE
+        WHILE r <= -period / 2 DO
+            r := r + period;
+        ENDWHILE
+        RETURN r;
+    ENDFUNC
 
     PROC PickAndPlace(robtarget pickTarget, robtarget placeTarget)
         MoveJ p10, v1000, fine, tool1\WObj:=wobj1;
@@ -258,15 +276,10 @@ MODULE MainModule
                                 dynamicPickTarget := aruco;
                                 dynamicPickTarget.trans := [val_x, val_y, pickZ];
                                 IF str_shape = "star" THEN
-                                    ! Turn by the difference to the slot, the short way (-36..+36)
-                                    rotDeg := val_angle - STAR_SLOT_ANGLE;
-                                    WHILE rotDeg > 36 DO
-                                        rotDeg := rotDeg - 72;
-                                    ENDWHILE
-                                    WHILE rotDeg < -36 DO
-                                        rotDeg := rotDeg + 72;
-                                    ENDWHILE
-                                    rotDeg := STAR_ROT_SIGN * rotDeg;
+                                    ! Turn the gripper so that, once it has moved to the slot
+                                    ! target, the star sits at STAR_SLOT_ANGLE. The tool's Z
+                                    ! axis points down, so RelTool +Rz turns the heading by -Rz.
+                                    rotDeg := WrapAngle(Heading(aruco.rot) - Heading(placeBase.rot) - val_angle + STAR_SLOT_ANGLE, 72);
                                 ELSE
                                     rotDeg := val_angle;
                                 ENDIF
