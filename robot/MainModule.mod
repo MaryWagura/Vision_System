@@ -25,6 +25,35 @@ MODULE MainModule
     PERS num nSquare := 1;
     CONST num MAX_PER_SLOT := 3;    ! stop before a slot overflows
 
+    ! --- Star rotation (so the star lines up with its slot when placed) ---
+    ! The Pi sends the star's angle CLOCKWISE FROM NORTH as seen in the live feed,
+    ! 0..72 deg (north = a point towards the top of the image; 0 = one point up).
+    ! STAR_SLOT_ANGLE = that angle for a star sitting in the slot. The slot's star
+    ! faces north, so it is 0. The gripper headings are read from the aruco and
+    ! slot targets themselves, so re-teaching the slot target (even rotated) is fine.
+    CONST num STAR_SLOT_ANGLE := 0;
+    ! Same for the square: angle clockwise from north, 0..90 (0 = upright, 45 = diamond).
+    ! The square slot is upright, so 0.
+    CONST num SQUARE_SLOT_ANGLE := 0;
+
+    ! Direction of the tool's X axis seen from above, in work-object axes (deg)
+    FUNC num Heading(orient o)
+        RETURN ATan2(2 * (o.q2 * o.q3 + o.q1 * o.q4), 1 - 2 * (o.q3 * o.q3 + o.q4 * o.q4));
+    ENDFUNC
+
+    ! Wrap an angle into (-period/2, +period/2]
+    FUNC num WrapAngle(num a, num period)
+        VAR num r;
+        r := a;
+        WHILE r > period / 2 DO
+            r := r - period;
+        ENDWHILE
+        WHILE r <= -period / 2 DO
+            r := r + period;
+        ENDWHILE
+        RETURN r;
+    ENDFUNC
+
     PROC PickAndPlace(robtarget pickTarget, robtarget placeTarget)
         MoveJ p10, v1000, fine, tool1\WObj:=wobj1;
 
@@ -109,6 +138,7 @@ MODULE MainModule
         VAR num val_x;
         VAR num val_y;
         VAR num val_angle;
+        VAR num rotDeg;
         VAR bool ok_x;
         VAR bool ok_y;
         VAR bool ok_angle;
@@ -247,7 +277,17 @@ MODULE MainModule
                             ELSE
                                 dynamicPickTarget := aruco;
                                 dynamicPickTarget.trans := [val_x, val_y, pickZ];
-                                dynamicPickTarget := RelTool(dynamicPickTarget, 0, 0, 0 \Rz:=val_angle);
+                                ! Turn the gripper so that, once it has moved to the slot target,
+                                ! the shape sits at its slot angle. Headings come from the targets
+                                ! themselves; the tool's Z points down, so RelTool +Rz turns it by -Rz.
+                                IF str_shape = "star" THEN
+                                    rotDeg := WrapAngle(Heading(aruco.rot) - Heading(placeBase.rot) + val_angle - STAR_SLOT_ANGLE, 72);
+                                ELSEIF str_shape = "square" THEN
+                                    rotDeg := WrapAngle(Heading(aruco.rot) - Heading(placeBase.rot) + val_angle - SQUARE_SLOT_ANGLE, 90);
+                                ELSE
+                                    rotDeg := 0;
+                                ENDIF
+                                dynamicPickTarget := RelTool(dynamicPickTarget, 0, 0, 0 \Rz:=rotDeg);
 
                                 ! Release each extra shape one thickness higher
                                 placeTarget := Offs(placeBase, 0, 0, PLACE_DZ + stackN * SHAPE_THICK);

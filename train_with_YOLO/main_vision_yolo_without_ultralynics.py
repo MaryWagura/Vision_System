@@ -255,13 +255,54 @@ SHAPE_SYMMETRY_DEGREES = {
 }
 
 
-def shape_angle(cnt, shape_name):
-    """Gripper rotation for the shape, reduced by its symmetry."""
-    symmetry = SHAPE_SYMMETRY_DEGREES.get(shape_name)
-    if not symmetry:
+def star_angle_cw_north(cnt):
+    """
+    Star rotation, measured CLOCKWISE FROM NORTH as seen in the live feed,
+    0..72 degrees (a star repeats every 72 deg). North = a point towards the
+    top of the image (robot -X); 0 = one point straight up.
+
+    Uses the 5 tips (points furthest from the centre): each tip's clockwise
+    angle from north, averaged with 72-degree symmetry.
+    """
+    m = cv2.moments(cnt)
+    if m["m00"] == 0:
         return 0.0
-    (_, _), (_, _), raw_angle = cv2.minAreaRect(cnt)
-    return float(raw_angle % symmetry)
+    cx, cy = m["m10"] / m["m00"], m["m01"] / m["m00"]
+    pts = cnt[:, 0, :].astype(float)
+    dist = np.hypot(pts[:, 0] - cx, pts[:, 1] - cy)
+
+    tips = []
+    for i in np.argsort(dist)[::-1]:
+        dx, dy = pts[i, 0] - cx, pts[i, 1] - cy
+        a = np.degrees(np.arctan2(dx, -dy))      # 0 = north (image up), 90 = east, clockwise
+        if all(abs(((a - b + 180) % 360) - 180) > 20 for b in tips):
+            tips.append(a)
+        if len(tips) == 5:
+            break
+
+    # Average with 72-degree symmetry: multiply by 5, average as unit vectors, divide by 5
+    v = np.exp(1j * np.radians(np.array(tips) * 5)).mean()
+    return float((np.degrees(np.angle(v)) / 5) % 72)
+
+
+def square_angle_cw_north(cnt):
+    """
+    Square rotation, CLOCKWISE FROM NORTH as seen in the live feed, 0..90 degrees
+    (a square repeats every 90 deg). 0 = upright (edges pointing N/E/S/W),
+    45 = diamond. Uses an edge of the minimum-area rectangle around the square.
+    """
+    box = cv2.boxPoints(cv2.minAreaRect(cnt))
+    dx, dy = box[1] - box[0]
+    return float(np.degrees(np.arctan2(dx, -dy)) % 90)
+
+
+def shape_angle(cnt, shape_name):
+    """Shape rotation clockwise from north (live feed), reduced by its symmetry. Circle = 0."""
+    if shape_name == "star":
+        return star_angle_cw_north(cnt)
+    if shape_name == "square":
+        return square_angle_cw_north(cnt)
+    return 0.0
 
 
 def process_frame(img):
