@@ -25,6 +25,15 @@ MODULE MainModule
     PERS num nSquare := 1;
     CONST num MAX_PER_SLOT := 3;    ! stop before a slot overflows
 
+    ! --- Star rotation (so the star lines up with its slot when placed) ---
+    ! The Pi sends the star's rotation in robot axes (-36..+36 deg).
+    ! STAR_SLOT_ANGLE: the angle the live feed shows for a star lying on the paper
+    !                  turned exactly like the star slot on the board. Set once.
+    ! STAR_ROT_SIGN  : 1 or -1. If a star placed after the fix is turned the wrong way
+    !                  (about twice as far off), change this to -1.
+    CONST num STAR_SLOT_ANGLE := 0;
+    CONST num STAR_ROT_SIGN := 1;
+
     PROC PickAndPlace(robtarget pickTarget, robtarget placeTarget)
         MoveJ p10, v1000, fine, tool1\WObj:=wobj1;
 
@@ -109,6 +118,7 @@ MODULE MainModule
         VAR num val_x;
         VAR num val_y;
         VAR num val_angle;
+        VAR num rotDeg;
         VAR bool ok_x;
         VAR bool ok_y;
         VAR bool ok_angle;
@@ -247,7 +257,20 @@ MODULE MainModule
                             ELSE
                                 dynamicPickTarget := aruco;
                                 dynamicPickTarget.trans := [val_x, val_y, pickZ];
-                                dynamicPickTarget := RelTool(dynamicPickTarget, 0, 0, 0 \Rz:=val_angle);
+                                IF str_shape = "star" THEN
+                                    ! Turn by the difference to the slot, the short way (-36..+36)
+                                    rotDeg := val_angle - STAR_SLOT_ANGLE;
+                                    WHILE rotDeg > 36 DO
+                                        rotDeg := rotDeg - 72;
+                                    ENDWHILE
+                                    WHILE rotDeg < -36 DO
+                                        rotDeg := rotDeg + 72;
+                                    ENDWHILE
+                                    rotDeg := STAR_ROT_SIGN * rotDeg;
+                                ELSE
+                                    rotDeg := val_angle;
+                                ENDIF
+                                dynamicPickTarget := RelTool(dynamicPickTarget, 0, 0, 0 \Rz:=rotDeg);
 
                                 ! Release each extra shape one thickness higher
                                 placeTarget := Offs(placeBase, 0, 0, PLACE_DZ + stackN * SHAPE_THICK);
