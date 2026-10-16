@@ -367,6 +367,48 @@ ssh pi@192.168.140.113
 
 ---
 
+## 🧑‍💻 Working on the Pi from VS Code (Remote-SSH)
+
+Instead of copying files with `scp`, you can open the Pi's folders directly in VS Code on the Windows desktop, then edit and run the scripts as if they were local.
+
+### 1. Install the Remote-SSH extension (only if it isn't installed yet)
+
+1. Open VS Code and go to **Extensions** (`Ctrl + Shift + X`, or the blocks icon on the left).
+2. Search for **`ssh`**.
+3. Install **Remote - SSH** by **Microsoft** (blue icon with `>_`, verified ✔ publisher). If it shows **Disable / Uninstall**, it's already installed.
+
+![Remote - SSH extension in the VS Code marketplace](docs/vscode_remote_ssh_install.png)
+
+### 2. Connect to the Pi
+
+1. Press `Ctrl + Shift + P` and run **Remote-SSH: Connect to Host...**
+2. Choose **+ Add New SSH Host...** and type:
+   ```
+   ssh pi@192.168.140.113
+   ```
+   (replace `pi` with the Pi's username if it's different). When asked where to save it, pick the first config file.
+3. Run **Remote-SSH: Connect to Host...** again and choose `192.168.140.113`. A new VS Code window opens.
+4. When asked **"Select the platform of the remote host"**, choose **Linux**. The Raspberry Pi runs Linux, even though your PC runs Windows.
+
+   ![Select Linux as the remote platform](docs/vscode_remote_ssh_platform.png)
+
+5. Enter the Pi's password when asked.
+6. The first connection takes a minute while VS Code sets itself up on the Pi ("Setting up SSH Host ... Initializing VS Code Server"). When it's done, the bottom-left corner shows **`SSH: 192.168.140.113`**.
+
+### 3. Open the project and run it
+
+1. **File → Open Folder...** → `/home/pi/Downloads` (or wherever the scripts are) → **OK**.
+2. **Terminal → New Terminal** opens a terminal **on the Pi**. Run the scripts there, for example:
+   ```bash
+   source ~/vision-env/bin/activate
+   python3 MainVision_finale.py
+   ```
+3. Files you save in VS Code are saved straight onto the Pi, so there's no need to `scp` them.
+
+> 💡 **Stuck on "Initializing VS Code Server"?** The Pi downloads the VS Code server from the internet the first time. If the Pi has no internet, open VS Code **Settings**, search for `remote.SSH.localServerDownload`, set it to **always** (the PC downloads it and copies it over), then connect again.
+
+---
+
 ## 📷 Checking the camera view
 
 To just see what the camera sees (e.g. after moving the camera, paper or marker), run [`camera_setup/camera_setup.py`](camera_setup/camera_setup.py) on the Pi and open **http://192.168.140.113:8080**:
