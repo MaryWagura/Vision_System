@@ -285,15 +285,24 @@ def star_angle_cw_north(cnt):
     return float((np.degrees(np.angle(v)) / 5) % 72)
 
 
+def square_angle_cw_north(cnt):
+    """
+    Square rotation, CLOCKWISE FROM NORTH as seen in the live feed, 0..90 degrees
+    (a square repeats every 90 deg). 0 = upright (edges pointing N/E/S/W),
+    45 = diamond. Uses an edge of the minimum-area rectangle around the square.
+    """
+    box = cv2.boxPoints(cv2.minAreaRect(cnt))
+    dx, dy = box[1] - box[0]
+    return float(np.degrees(np.arctan2(dx, -dy)) % 90)
+
+
 def shape_angle(cnt, shape_name):
-    """Gripper rotation for the shape, reduced by its symmetry."""
+    """Shape rotation clockwise from north (live feed), reduced by its symmetry. Circle = 0."""
     if shape_name == "star":
         return star_angle_cw_north(cnt)
-    symmetry = SHAPE_SYMMETRY_DEGREES.get(shape_name)
-    if not symmetry:
-        return 0.0
-    (_, _), (_, _), raw_angle = cv2.minAreaRect(cnt)
-    return float(raw_angle % symmetry)
+    if shape_name == "square":
+        return square_angle_cw_north(cnt)
+    return 0.0
 
 
 def process_frame(img):

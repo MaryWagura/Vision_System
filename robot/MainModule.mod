@@ -32,6 +32,9 @@ MODULE MainModule
     ! faces north, so it is 0. The gripper headings are read from the aruco and
     ! slot targets themselves, so re-teaching the slot target (even rotated) is fine.
     CONST num STAR_SLOT_ANGLE := 0;
+    ! Same for the square: angle clockwise from north, 0..90 (0 = upright, 45 = diamond).
+    ! The square slot is upright, so 0.
+    CONST num SQUARE_SLOT_ANGLE := 0;
 
     ! Direction of the tool's X axis seen from above, in work-object axes (deg)
     FUNC num Heading(orient o)
@@ -274,13 +277,15 @@ MODULE MainModule
                             ELSE
                                 dynamicPickTarget := aruco;
                                 dynamicPickTarget.trans := [val_x, val_y, pickZ];
+                                ! Turn the gripper so that, once it has moved to the slot target,
+                                ! the shape sits at its slot angle. Headings come from the targets
+                                ! themselves; the tool's Z points down, so RelTool +Rz turns it by -Rz.
                                 IF str_shape = "star" THEN
-                                    ! Turn the gripper so that, once it has moved to the slot
-                                    ! target, the star sits at STAR_SLOT_ANGLE. The tool's Z
-                                    ! axis points down, so RelTool +Rz turns the heading by -Rz.
                                     rotDeg := WrapAngle(Heading(aruco.rot) - Heading(placeBase.rot) + val_angle - STAR_SLOT_ANGLE, 72);
+                                ELSEIF str_shape = "square" THEN
+                                    rotDeg := WrapAngle(Heading(aruco.rot) - Heading(placeBase.rot) + val_angle - SQUARE_SLOT_ANGLE, 90);
                                 ELSE
-                                    rotDeg := val_angle;
+                                    rotDeg := 0;
                                 ENDIF
                                 dynamicPickTarget := RelTool(dynamicPickTarget, 0, 0, 0 \Rz:=rotDeg);
 
