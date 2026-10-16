@@ -48,8 +48,8 @@ VAR socketdev robotClient;
     
     SocketCreate robotClient;
     !#Set socket  port. To find the robot adress use cmd and type ipconfig in the terminal
-    !#you may have to open the port in the firewall as well. This must match server side when doing server_socket.bind192.168.140.113
-    SocketConnect robotClient, "192.168.125.207", 5000;
+    !#you may have to open the port in the firewall as well. This must match server side when doing server_socket.bind192.168.140.xxx
+    SocketConnect robotClient, "192.168.125.xxx", 5000;
     TPWrite "I LIVE!";
     ERROR
 
@@ -96,7 +96,7 @@ VAR string RobotClienReceivedString;
     ! - Creates socket.
     ! - Waits for incoming TCP connection.
     VAR string clientIP;	
-    VAR string ipController:= "192.168.125.1";  !PERS string ipController:= "192.168.125.1"; !robot default IP
+    VAR string ipController:= "192.168.125.xxx";  !PERS string ipController:= "192.168.125.xxx"; !robot default IP
     VAR num serverPort:= 5000;
     TPErase;
     SocketCreate serverSocket;

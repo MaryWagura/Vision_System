@@ -12,13 +12,13 @@ A camera above the table spots shapes on the paper, a Raspberry Pi works out **w
 
 | Device | IP address | Used for |
 |---|---|---|
-| **Raspberry Pi (Ethernet, robot network)** | **`192.168.125.207`** | ⭐ The robot talks to the Pi here (port **5000**). **This is what makes the robot move.** |
-| Raspberry Pi (LAN / Wi-Fi) | `192.168.140.113` | SSH, copying files (`scp`) and the live camera feed |
-| ABB robot controller | `192.168.125.1` | RobotStudio / FlexPendant connection |
+| **Raspberry Pi (Ethernet, robot network)** | **`192.168.125.xxx`** | ⭐ The robot talks to the Pi here (port **5000**). **This is what makes the robot move.** |
+| Raspberry Pi (LAN / Wi-Fi) | `192.168.140.xxx` | SSH, copying files (`scp`) and the live camera feed |
+| ABB robot controller | `192.168.125.xxx` | RobotStudio / FlexPendant connection |
 
-- Live camera feed (while the vision script runs): **http://192.168.140.113:8080**
-- The vision script listens on the Pi's robot-network address (`HOST = "192.168.125.207"` in `main_vision_yolo_without_ultralynics.py`), so the Pi must own that address on `eth0`. The RAPID side connects to the same address:
-  - RAPID `ServerComms` module: `SocketConnect robotClient, "192.168.125.207", 5000;`
+- Live camera feed (while the vision script runs): **http://192.168.140.xxx:8080**
+- The vision script listens on the Pi's robot-network address (`HOST = "192.168.125.xxx"` in `main_vision_yolo_without_ultralynics.py`), so the Pi must own that address on `eth0`. The RAPID side connects to the same address:
+  - RAPID `ServerComms` module: `SocketConnect robotClient, "192.168.125.xxx", 5000;`
 
 ---
 
@@ -31,7 +31,7 @@ There's **one Ethernet cable** going to the robot controller, and it's used for 
 | ✏️ **Edit the RAPID code** in RobotStudio | 🖥️ the **Windows desktop** |
 | ▶️ **Run the robot** with vision | 🍓 the **Raspberry Pi** |
 
-> ⚠️ **Always move the cable back to the Raspberry Pi before running the robot.** If the cable is still in the desktop, the robot can't reach the Pi at `.207` and the program will stall at "Requesting...".
+> ⚠️ **Always move the cable back to the Raspberry Pi before running the robot.** If the cable is still in the desktop, the robot can't reach the Pi at `.xxx` and the program will stall at "Requesting...".
 
 ---
 
@@ -126,7 +126,7 @@ You **don't need the whole repo** to run the cell. Download/copy only these file
 Copy them from Windows with one command (PowerShell, after downloading them into your `Downloads` folder):
 
 ```powershell
-scp "$env:USERPROFILE\Downloads\main_vision_yolo_without_ultralynics.py" "$env:USERPROFILE\Downloads\vision_common_with_yolo.py" "$env:USERPROFILE\Downloads\best.onnx" pi@192.168.140.113:~/Downloads/
+scp "$env:USERPROFILE\Downloads\main_vision_yolo_without_ultralynics.py" "$env:USERPROFILE\Downloads\vision_common_with_yolo.py" "$env:USERPROFILE\Downloads\best.onnx" pi@192.168.140.xxx:~/Downloads/
 ```
 
 Then check they arrived:
@@ -183,9 +183,9 @@ These are the commands used most often when setting up and running the vision sy
 | `source` | Activates a script or virtual environment in the current terminal. | `source ~/vision-env/bin/activate` |
 | `python3` | Runs Python 3 programs. | `python3 main_vision_yolo_without_ultralynics.py` |
 | `pip` | Installs Python packages. | `pip install flask` |
-| `ssh` | Connects to the Raspberry Pi remotely from another computer. | `ssh pi@192.168.140.113` |
-| `scp` | Copies files between computers over SSH. | `scp model.onnx pi@192.168.140.113:~/Downloads/` |
-| `ping` | Tests whether another device can be reached over the network. | `ping 192.168.125.1` |
+| `ssh` | Connects to the Raspberry Pi remotely from another computer. | `ssh pi@192.168.140.xxx` |
+| `scp` | Copies files between computers over SSH. | `scp model.onnx pi@192.168.140.xxx:~/Downloads/` |
+| `ping` | Tests whether another device can be reached over the network. | `ping 192.168.125.xxx` |
 | `ip addr` | Displays the Pi's network interfaces and IP addresses. | `ip addr show eth0` |
 | `ss` | Shows network connections and listening ports. Useful for checking ports `5000` and `8080`. | `ss -tlnp` |
 | `clear` | Clears the terminal window. | `clear` |
@@ -231,9 +231,9 @@ robot coordinates to the ABB controller over TCP. A live video feed is served ov
 
 | What | Address |
 |---|---|
-| Pi on Wi-Fi (live feed) | `http://192.168.140.112:8080` |
-| Pi on robot network (`eth0`) | `192.168.125.211` |
-| TCP server for RAPID | `192.168.125.211:5000` |
+| Pi on Wi-Fi (live feed) | `http://192.168.140.xxx:8080` |
+| Pi on robot network (`eth0`) | `192.168.125.xxx` |
+| TCP server for RAPID | `192.168.125.xxx:5000` |
 
 ### 1. Install dependencies (once)
 
@@ -274,28 +274,28 @@ If the list is empty, check the cable, port and power, and watch `sudo dmesg -w`
 
 ### 3. Connect the Pi to the robot network
 
-The script listens on `192.168.125.211`, which is the address the RAPID code connects to. The Pi must own this address
+The script listens on `192.168.125.xxx`, which is the address the RAPID code connects to. The Pi must own this address
 on `eth0`, or the TCP server fails with `OSError: [Errno 99] Cannot assign requested address`.
 
 1. Connect an Ethernet cable from the Pi's `eth0` to the robot controller's network.
 2. Give `eth0` the robot-network address:
 
    ```bash
-   sudo ip addr add 192.168.125.211/24 dev eth0
-   ip addr show eth0        # should show: state UP  and  inet 192.168.125.211/24
+   sudo ip addr add 192.168.125.xxx/24 dev eth0
+   ip addr show eth0        # should show: state UP  and  inet 192.168.125.xxx/24
    ```
 
 3. Check you can reach the controller (replace with your controller's IP if it is different):
 
    ```bash
-   ping 192.168.125.1
+   ping 192.168.125.xxx
    ```
 
 The `ip addr add` command is lost on reboot. To make the address permanent:
 
 ```bash
 nmcli con show                                   # find the wired connection name
-sudo nmcli con mod "Wired connection 1" ipv4.method manual ipv4.addresses 192.168.125.211/24
+sudo nmcli con mod "Wired connection 1" ipv4.method manual ipv4.addresses 192.168.125.xxx/24
 sudo nmcli con up "Wired connection 1"
 ```
 
@@ -315,12 +315,12 @@ Expected startup output:
 
 ```
 Model warm-up: ... ms (not counted)
-TCP Server listening on 192.168.125.211:5000
-Live Video Feed available at: http://192.168.140.112:8080
+TCP Server listening on 192.168.125.xxx:5000
+Live Video Feed available at: http://192.168.140.xxx:8080
 Camera active. Waiting for robot...
 ```
 
-Open the live feed from a PC on the same Wi-Fi: `http://192.168.140.112:8080`. Stop the script with `Ctrl + C`.
+Open the live feed from a PC on the same Wi-Fi: `http://192.168.140.xxx:8080`. Stop the script with `Ctrl + C`.
 
 To test without the robot, set `HOST = "0.0.0.0"` in the script so it listens on every interface.
 
@@ -332,10 +332,10 @@ To test without the robot, set `HOST = "0.0.0.0"` in the script so it listens on
 | `No matching distribution found for OpenCV` | Wrong package name | `pip install opencv-contrib-python --break-system-packages` |
 | `AttributeError: ... 'ArucoDetector'` | OpenCV is older than 4.7 (e.g. the apt `python3-opencv`) | `sudo apt remove python3-opencv`, then `pip install opencv-contrib-python --break-system-packages` |
 | `No device is available ... (file 'TlFactory.cpp', line 694)` | pylon found **no camera** (the file name is from Basler's internal C++ SDK) | See step 2: cable, USB 3 port, power, camera plugged into the Pi |
-| `OSError: [Errno 99] Cannot assign requested address` | The Pi doesn't have the IP in `HOST` | See step 3: give `eth0` the address `192.168.125.211` |
+| `OSError: [Errno 99] Cannot assign requested address` | The Pi doesn't have the IP in `HOST` | See step 3: give `eth0` the address `192.168.125.xxx` |
 | `OSError: [Errno 98] Address already in use` | Another program is already using the port | `sudo ss -tlnp \| grep 5000` to find it, then stop it (or wait ~30 s after a restart) |
 | `eth0` shows `NO-CARRIER` | No live cable link | Check the cable, and the camera/switch power |
-| Live feed doesn't load | Server not running or not reachable | On the Pi: `ss -tlnp \| grep 8080`. On Windows: `Test-NetConnection 192.168.140.112 -Port 8080` |
+| Live feed doesn't load | Server not running or not reachable | On the Pi: `ss -tlnp \| grep 8080`. On Windows: `Test-NetConnection 192.168.140.xxx -Port 8080` |
 
 ---
 
@@ -345,22 +345,22 @@ Run these in **PowerShell** on the Windows desktop. Replace `pi` with the Pi's u
 
 **Copy one file** from your Windows `Downloads` to the Pi's `Downloads`:
 ```powershell
-scp "$env:USERPROFILE\Downloads\best.onnx" student@192.168.140.113:~/Downloads/
+scp "$env:USERPROFILE\Downloads\best.onnx" student@192.168.140.xxx:~/Downloads/
 ```
 
 **Copy several files at once:**
 ```powershell
-scp "$env:USERPROFILE\Downloads\main_vision_yolo_without_ultralynics.py" "$env:USERPROFILE\Downloads\vision_common_with_yolo.py" pi@192.168.140.113:~/Downloads/
+scp "$env:USERPROFILE\Downloads\main_vision_yolo_without_ultralynics.py" "$env:USERPROFILE\Downloads\vision_common_with_yolo.py" pi@192.168.140.xxx:~/Downloads/
 ```
 
 **Copy a whole folder:**
 ```powershell
-scp -r "$env:USERPROFILE\Downloads\my_folder" pi@192.168.140.113:~/Downloads/
+scp -r "$env:USERPROFILE\Downloads\my_folder" pi@192.168.140.xxx:~/Downloads/
 ```
 
 **Log in to the Pi:**
 ```powershell
-ssh pi@192.168.140.113
+ssh pi@192.168.140.xxx
 ```
 
 > 💡 The first time, it asks *"Are you sure you want to continue connecting?"*: type `yes`, then enter the Pi's password.
@@ -384,16 +384,16 @@ Instead of copying files with `scp`, you can open the Pi's folders directly in V
 1. Press `Ctrl + Shift + P` and run **Remote-SSH: Connect to Host...**
 2. Choose **+ Add New SSH Host...** and type:
    ```
-   ssh pi@192.168.140.113
+   ssh pi@192.168.140.xxx
    ```
    (replace `pi` with the Pi's username if it's different). When asked where to save it, pick the first config file.
-3. Run **Remote-SSH: Connect to Host...** again and choose `192.168.140.113`. A new VS Code window opens.
+3. Run **Remote-SSH: Connect to Host...** again and choose `192.168.140.xxx`. A new VS Code window opens.
 4. When asked **"Select the platform of the remote host"**, choose **Linux**. The Raspberry Pi runs Linux, even though your PC runs Windows.
 
    ![Select Linux as the remote platform](docs/vscode_remote_ssh_platform.png)
 
 5. Enter the Pi's password when asked.
-6. The first connection takes a minute while VS Code sets itself up on the Pi ("Setting up SSH Host ... Initializing VS Code Server"). When it's done, the bottom-left corner shows **`SSH: 192.168.140.113`**.
+6. The first connection takes a minute while VS Code sets itself up on the Pi ("Setting up SSH Host ... Initializing VS Code Server"). When it's done, the bottom-left corner shows **`SSH: 192.168.140.xxx`**.
 
 ### 3. Open the project and run it
 
@@ -411,7 +411,7 @@ Instead of copying files with `scp`, you can open the Pi's folders directly in V
 
 ## 📷 Checking the camera view
 
-To just see what the camera sees (e.g. after moving the camera, paper or marker), run [`camera_setup/camera_setup.py`](camera_setup/camera_setup.py) on the Pi and open **http://192.168.140.113:8080**:
+To just see what the camera sees (e.g. after moving the camera, paper or marker), run [`camera_setup/camera_setup.py`](camera_setup/camera_setup.py) on the Pi and open **http://192.168.140.xxx:8080**:
 
 ```bash
 python3 camera_setup.py
@@ -426,13 +426,13 @@ Stop it with `Ctrl + C` before starting the vision script, because both use the 
 1. 🔌 **Cable:** robot Ethernet cable plugged into the **Raspberry Pi**.
 2. 🍓 **Start the vision script on the Pi:**
    ```bash
-   ssh pi@192.168.140.113
+   ssh pi@192.168.140.xxx
    source ~/vision-env/bin/activate
    cd ~/Downloads
    python3 main_vision_yolo_without_ultralynics.py
    ```
-   Wait for `TCP Server listening on 192.168.125.207:5000` and `Camera active`.
-3. 👀 **Check the live feed** at http://192.168.140.113:8080. You should see the red **Origin** dot on the marker and green dots on the shapes.
+   Wait for `TCP Server listening on 192.168.125.xxx:5000` and `Camera active`.
+3. 👀 **Check the live feed** at http://192.168.140.xxx:8080. You should see the red **Origin** dot on the marker and green dots on the shapes.
 4. 🤖 **Start the robot program** (`MainModule`) on the FlexPendant. It connects to the Pi ("I LIVE").
 5. 🎨 **Choose a colour, then a shape** on the FlexPendant (see the next section). The menus only list what the camera sees.
 6. 🟡 **Press the yellow button** when the pendant says *"Press yellow button to pick the …"*.
@@ -523,7 +523,7 @@ These must stay consistent between the robot and the Python script.
 | Robot picks the right spot but places in the wrong slot | Re-teach `p20` (circle), `p30` (star), `p40` (square) in `wobj1`. |
 | Every shape skipped as *"Unknown shape"* | Shape names don't match: RAPID must compare lowercase `circle` / `star` / `square`. |
 | Triangle or hexagon gets picked | The geometry check in the vision script is off or needs tuning. Check the printed `corners=… circle_fill=…` values. |
-| `scp` / `ssh` times out | Use the Pi's LAN IP `192.168.140.113`, not `.207`, and check the Pi is powered on. |
+| `scp` / `ssh` times out | Use the Pi's LAN IP `192.168.140.xxx`, not `.xxx`, and check the Pi is powered on. |
 
 ## Acknowledgements
 *This Project was in collaboration with Elias & Kelvin.*

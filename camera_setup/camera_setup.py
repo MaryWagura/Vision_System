@@ -1,7 +1,7 @@
 """
 camera_setup.py - start the Basler camera and show the live view.
 
-    python3 camera_setup.py      # then open http://192.168.140.113:8080
+    python3 camera_setup.py      # then open http://192.168.140.xxx:8080
 
 Stop with Ctrl + C before running the vision script (both use the camera and port 8080).
 """
@@ -32,7 +32,7 @@ def video_feed():
 
 def main():
     threading.Thread(target=lambda: app.run(host="0.0.0.0", port=8080), daemon=True).start()
-    print("Live view: http://192.168.140.113:8080   (Ctrl + C to stop)")
+    print("Live view: http://192.168.140.xxx:8080   (Ctrl + C to stop)")
 
     camera = pylon.InstantCamera(pylon.TlFactory.GetInstance().CreateFirstDevice())
     camera.Open()

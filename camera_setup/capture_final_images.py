@@ -77,7 +77,7 @@ def main():
     # Start Flask web server in a background daemon thread
     server_thread = threading.Thread(target=run_flask, daemon=True)
     server_thread.start()
-    print(f"\n[INFO] Live feed active at: http://192.168.140.113:{FLASK_PORT}\n")
+    print(f"\n[INFO] Live feed active at: http://192.168.140.xxx:{FLASK_PORT}\n")
 
     try:
         tl_factory = pylon.TlFactory.GetInstance()

@@ -10,7 +10,7 @@ from ultralytics import YOLO
 import vision_common_v8_new as vc
 
 # --- CONFIGURATION ---
-HOST = "192.168.125.207"
+HOST = "192.168.125.xxx"
 PORT = 5000  # Matches ABB RAPID code
 
 # *** PHYSICAL CALIBRATION TARGETS ***
@@ -177,7 +177,7 @@ def main():
     log = logging.getLogger('werkzeug')
     log.setLevel(logging.ERROR)
     threading.Thread(target=lambda: app.run(host='0.0.0.0', port=8080, debug=False, use_reloader=False), daemon=True).start()
-    print("Live Video Feed available at: http://192.168.140.113:8080")
+    print("Live Video Feed available at: http://192.168.140.xxx:8080")
 
     try:
         tl_factory = pylon.TlFactory.GetInstance()
