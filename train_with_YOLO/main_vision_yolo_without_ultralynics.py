@@ -15,10 +15,10 @@ PORT = 5000  # Matches ABB RAPID code
 
 # *** PHYSICAL CALIBRATION TARGETS ***
 # Must match the X/Y of the RAPID 'aruco' target (tool1234, wobj1212)
-MARKER_ROBOT_X_MM = 118.64
-MARKER_ROBOT_Y_MM = 193.32
+MARKER_ROBOT_X_MM =148.98
+MARKER_ROBOT_Y_MM =208.36
 
-# --- GRADE D: colour AND shape are chosen on the FlexPendant each cycle ---
+# --- colour AND shape are chosen on the FlexPendant each cycle ---
 # Robot commands (the pendant only offers what the camera actually sees):
 #   LIST_COLORS                       -> "blue,red"         (or "NONE")
 #   LIST_SHAPES,<colour>              -> "square,star"      (or "NONE")
