@@ -254,12 +254,45 @@ SHAPE_SYMMETRY_DEGREES = {
     "star": 72.0,
 }
 
+# Image angle (x right, y down) of a star tip when the star matches the slot at p30.
+# -90 = one tip pointing straight up in the camera image.
+STAR_REF_DEG = -90.0
+
+
+def star_angle(cnt):
+    """
+    Star rotation from its 5 tips, relative to STAR_REF_DEG, wrapped to -36..+36.
+    minAreaRect is unstable for a star (its hull is a pentagon, so 5 rectangles tie).
+    """
+    m = cv2.moments(cnt)
+    cx, cy = m["m10"] / m["m00"], m["m01"] / m["m00"]
+    pts = cnt.reshape(-1, 2).astype(float) - (cx, cy)
+    dist = np.hypot(pts[:, 0], pts[:, 1])
+    ang = np.degrees(np.arctan2(pts[:, 1], pts[:, 0]))
+
+    # 5 tips = farthest points from the centre, at least 36 deg apart
+    tips = []
+    for i in np.argsort(-dist):
+        if all(abs((ang[i] - t + 180) % 360 - 180) > 36 for t in tips):
+            tips.append(ang[i])
+            if len(tips) == 5:
+                break
+
+    # Average the tips on the 72 deg symmetry (x5 maps every tip onto the same angle)
+    rad = np.radians(np.array(tips) * 5)
+    mean = np.degrees(np.arctan2(np.sin(rad).sum(), np.cos(rad).sum())) / 5
+
+    # Smallest gripper rotation that lines the star up with the slot
+    return float((mean - STAR_REF_DEG + 36) % 72 - 36)
+
 
 def shape_angle(cnt, shape_name):
     """Gripper rotation for the shape, reduced by its symmetry."""
     symmetry = SHAPE_SYMMETRY_DEGREES.get(shape_name)
     if not symmetry:
         return 0.0
+    if shape_name == "star":
+        return star_angle(cnt)
     (_, _), (_, _), raw_angle = cv2.minAreaRect(cnt)
     return float(raw_angle % symmetry)
 
