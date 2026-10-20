@@ -266,7 +266,7 @@ MODULE MainModule
                                 ENDIF
                                 nCycles := nCycles + 1;
                                 TPWrite "Cycle " + NumToStr(nCycles, 0) + " done: placed the " + colour + " " + shape + ".";
-                                WaitTime 1;
+                                WaitTime 0.2;
                             ENDIF
                         ELSE
                             TPWrite "Bad data received: " + visionData;
