@@ -445,14 +445,16 @@ Stop it with `Ctrl + C` before starting the vision script, because both use the 
 
 Each cycle the operator chooses **one object** by colour and shape. The menus are built from what the camera detects, so you can only choose something that's actually on the paper.
 
+The FlexPendant shows each menu as a list: **tap an entry, then press OK**.
+
 ```
 Which colour should the robot pick?        Which red shape should the robot pick?
-1 = blue                                   1 = square
-2 = red                                    2 = star
-0 = Refresh the list                       0 = Refresh the list
-9 = Board emptied (reset slot counters)    Enter a number:  2
-Enter a number:  2
+  blue                                       square
+  red                                        star
+  Refresh the list                           Refresh the list
+  Board emptied (reset slot counters)
 ```
+Blank rows at the bottom of a list are normal (RAPID lists have a fixed size). Tapping one just refreshes the list.
 
 | Robot sends | Pi answers |
 |---|---|
@@ -462,8 +464,8 @@ Enter a number:  2
 
 - **Colours:** black, red, green, blue, white. **Shapes:** circle (→ `p20`), star (→ `p30`), square (→ `p40`).
 - **Two identical objects** (e.g. two red squares): the one closest to the marker is picked first; choose it again next cycle for the other. Extra shapes in the same slot are released 10 mm higher each time.
-- **After emptying the board**, choose **9** in the colour menu to reset the slot counters.
-- **0** refreshes the menu, e.g. after putting new shapes on the paper.
+- **After emptying the board**, choose **Board emptied** in the colour menu to reset the slot counters.
+- **Refresh the list** updates the menu, e.g. after putting new shapes on the paper.
 
 ### ⏱️ Inference time (must be ≤ 3 s)
 
@@ -474,6 +476,13 @@ The vision script prints a line for every frame, e.g.:
 - **Total detection** = camera frame in → shapes, colours and robot X/Y out. This is the number checked against the 3 s limit.
 - Frames over the limit print a `[WARNING]` line, and the live feed shows the time in red.
 - Every frame is also saved to `inference_log.csv` (next to the script) as evidence for the report.
+
+---
+
+## 📝 Things to note
+
+- **The `aruco` target's Z must be ≤ 0** (in `wobj1`). Teach it with the cup touching the paper on the marker's centre. The pick height is the `aruco` Z + 10 mm (shape thickness). If Z is above 0, the cup stops above the shape and the vacuum can't grab it.
+- **The camera must be perpendicular to the A3 paper**, looking straight down. If it's tilted, the image is skewed, so the angles (especially the star's) and positions sent to the robot are wrong, and the shape lands rotated or off-centre in its slot. Re-check this whenever the camera is bumped or moved.
 
 ---
 
@@ -489,13 +498,12 @@ These must stay consistent between the robot and the Python script.
 | Image ↔ robot axes | robot **+X = image down**, robot **+Y = image right** |
 | Marker position | Taught RAPID target `aruco` (cup centred on the marker, touching the paper). Python sends positions **relative to the marker**, so nothing in Python needs changing. |
 | Marker size | 100 mm (outer black square), `DICT_5X5_100` |
-| Pick height | Taught RAPID target `shapeTop`: cup pressed onto a real shape until the vacuum holds it. Its Z is used directly, whether it's positive or negative. |
-| Shape thickness | 10 mm (only used to stack extra shapes in a slot). |
+| Pick height | Calculated in RAPID: `aruco` Z + `SHAPE_THICK` (10 mm) − `SQUEEZE`, i.e. the top face of a shape. Never lower than `aruco` Z + 2 mm (`MIN_ABOVE_PAPER`). |
+| Shape thickness | 10 mm (`SHAPE_THICK`). Used for the pick height and to stack extra shapes in a slot. |
 | Shape names | Python sends lowercase: `circle`, `square`, `star` |
 
-**If the paper, marker, tool or work object changes:** re-teach two points on the FlexPendant (`tool1` + `wobj1`, then **Modify Position**). No code changes, in Python or RAPID:
-1. **`aruco`**: jog the cup onto the marker's centre, touching the paper.
-2. **`shapeTop`**: put a shape on the paper, jog the cup down onto it, turn the valve on and keep going down until the vacuum holds the shape. Modify Position there.
+**If the paper, marker, tool or work object changes:** re-teach the `aruco` point on the FlexPendant (`tool1` + `wobj1`, then **Modify Position**). No code changes, in Python or RAPID:
+- **`aruco`**: jog the cup onto the marker's centre, touching the paper (Z must be ≤ 0, see *Things to note*). The pick height is calculated from this point.
 
 **If the camera gets bumped or moved:** re-check the marker position and the axis directions before running.
 
@@ -517,7 +525,7 @@ These must stay consistent between the robot and the Python script.
 | Pendant stuck at after *"I LIVE"*, or no colour menu appears | Cable is still in the desktop, or the vision script isn't running. Plug the cable into the Pi and start the script. |
 | Pendant keeps saying *"No pickable shapes on the paper"* | The camera sees no circle/square/star with a recognised colour. Check the live feed and the `colour=…` debug lines on the Pi. |
 | A shape is on the paper but missing from the menu | Its colour came out `unknown`, or it failed the geometry check. Check the `colour=…` / `corners=…` debug lines and tune the thresholds. |
-| Cup stops above the shape / vacuum doesn't hold | Re-teach `shapeTop` with the cup pressed onto a shape until the vacuum holds. If it still slips, set `EXTRA_SQUEEZE` to 0.5–1. |
+| Cup stops above the shape / vacuum doesn't hold | Re-teach `aruco` with the cup touching the paper (Z ≤ 0). If it still slips, set `SQUEEZE` in `MainModule.mod` to 0.5–1 (presses the cup that much lower). |
 | `no marker` printed on the Pi | Marker not in view, covered or badly lit. |
 | Shapes detected but the robot goes to the wrong place | The paper, marker or camera moved. Re-teach `aruco` (cup on the marker centre). |
 | Robot picks the right spot but places in the wrong slot | Re-teach `p20` (circle), `p30` (star), `p40` (square) in `wobj1`. |
