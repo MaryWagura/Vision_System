@@ -19,7 +19,7 @@ MODULE MainModule
     CONST num REACH_Y := 140;
 
     ! --- Slot bookkeeping (how many shapes are already in each slot) ---
-    ! PERS: survives a program restart. Reset with option 9 after emptying the board.
+    ! PERS: survives a program restart. Reset with "Board emptied" after emptying the board.
     PERS num nCircle := 0;
     PERS num nStar := 1;
     PERS num nSquare := 1;
@@ -62,35 +62,42 @@ MODULE MainModule
         ENDWHILE
     ENDPROC
 
-    ! Show a numbered menu built from what the camera sees and let the operator
-    ! choose with TPReadNum. Returns the chosen item, "refresh" (0),
-    ! "reset" (9, only when allowReset) or "" for an invalid number.
+    ! Show a list built from what the camera sees and let the operator tap
+    ! an entry on the FlexPendant (UIListView). Returns the chosen item,
+    ! "refresh" or "reset" (only offered when allowReset).
     FUNC string ChooseFrom(string question, string listStr, bool allowReset)
         VAR string items{5};
+        VAR listitem menu{7};
         VAR num n;
         VAR num i;
+        VAR num nMenu;
         VAR num choice;
+        VAR btnres answer;
 
         SplitList listStr, items, n;
 
-        TPWrite question;
         FOR i FROM 1 TO n DO
-            TPWrite NumToStr(i, 0) + " = " + items{i};
+            menu{i} := ["", items{i}];
         ENDFOR
-        TPWrite "0 = Refresh the list";
+        nMenu := n + 1;
+        menu{nMenu} := ["", "Refresh the list"];
         IF allowReset THEN
-            TPWrite "9 = Board emptied (reset slot counters)";
+            nMenu := nMenu + 1;
+            menu{nMenu} := ["", "Board emptied (reset slot counters)"];
         ENDIF
-        TPReadNum choice, "Enter a number:";
+        ! RAPID arrays are fixed size: unused rows stay blank and count as "refresh"
+        FOR i FROM nMenu + 1 TO Dim(menu, 1) DO
+            menu{i} := ["", ""];
+        ENDFOR
 
-        IF choice >= 1 AND choice <= n AND choice = Round(choice) THEN
+        choice := UIListView(\Result:=answer \Header:=question, menu \Buttons:=btnOK \Icon:=iconInfo \DefaultIndex:=1);
+
+        IF choice >= 1 AND choice <= n THEN
             RETURN items{choice};
-        ELSEIF choice = 0 THEN
-            RETURN "refresh";
-        ELSEIF choice = 9 AND allowReset THEN
+        ELSEIF allowReset AND choice = n + 2 THEN
             RETURN "reset";
         ENDIF
-        RETURN "";
+        RETURN "refresh";
     ENDFUNC
 
     PROC main()
@@ -151,10 +158,6 @@ MODULE MainModule
                 TPWrite "Slot counters reset - board is empty.";
                 WaitTime 1;
 
-            ELSEIF colour = "" THEN
-                TPWrite "Invalid choice - please enter a number from the list.";
-                WaitTime 2;
-
             ELSE
                 RobotClienSendMessage("LIST_SHAPES," + colour);
                 shapeList := RobotClientReciveMessage();
@@ -171,9 +174,6 @@ MODULE MainModule
                     ! Back to the colour menu
                     WaitTime 0.1;
 
-                ELSEIF shape = "" THEN
-                    TPWrite "Invalid choice - please enter a number from the list.";
-                    WaitTime 2;
                 ELSE
                     TPWrite "Looking for a " + colour + " " + shape + "...";
                     RobotClienSendMessage("REQUEST_COORDS," + colour + "," + shape);
@@ -242,7 +242,7 @@ MODULE MainModule
                                 TPWrite "Target outside pick area - skipped";
                                 WaitTime 2;
                             ELSEIF stackN >= MAX_PER_SLOT THEN
-                                TPWrite "The " + str_shape + " slot is full - empty it, then choose 9.";
+                                TPWrite "The " + str_shape + " slot is full - empty it, then choose Board emptied.";
                                 WaitTime 2;
                             ELSE
                                 dynamicPickTarget := aruco;
